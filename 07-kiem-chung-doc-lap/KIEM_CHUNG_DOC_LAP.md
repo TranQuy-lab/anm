@@ -197,7 +197,7 @@ chữa gây ra. Kết quả và cách xử lý:
 | Keylog của capture đầy đủ **không khớp pcap** ⇒ phần −10 B không giải mã được | MINOR (đã nâng) | `run_ch_budget.sh` truyền `-keylogfile` cùng lần chạy; thêm **check C3** giải mã EE (12 → 2 B) |
 | Chi tiết nhỏ: thiếu ChangeCipherSpec trong mô tả flight; làm tròn 8,60 vs 8,59; `sv_spread` bị bỏ sót; sign test một phía; "≈ ngẫu nhiên" cho 0,58–0,59; `docker-lab/README.md` còn văn phong v1 | MINOR | Đã sửa toàn bộ; `sv_spread` nay được báo cáo như một góc nhìn của cùng cơ chế phân mảnh |
 
-Sau tất cả các sửa, audit tự động đạt **14/14 PASS** (thêm check C3).
+Sau tất cả các sửa, audit tự động đạt **15/15 PASS** (thêm check C3 và check K2 — kiểm chứng chuỗi nhân quả PMTUD trực tiếp trong pcap).
 
 ## 7. Bảng đối chiếu v1 → v2
 

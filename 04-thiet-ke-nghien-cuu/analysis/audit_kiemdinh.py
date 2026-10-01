@@ -421,6 +421,43 @@ if os.path.exists(pm):
 else:
     check("K", "Thí nghiệm PMTUD blackhole", None, "chưa chạy run_pmtud.sh")
 
+# ---------------------------------------------------------------- CHECK K2: cơ chế PMTUD trong pcap
+# Không chỉ đếm "hoàn tất / không": kiểm tra CHUỖI NHÂN QUẢ trong chính pcap.
+def ts_fields(pcap, filt, fields):
+    out = subprocess.run(["tshark", "-r", pcap, "-Y", filt, "-T", "fields"]
+                         + sum([["-e", f] for f in fields], []),
+                         capture_output=True, text=True).stdout.strip().split("\n")
+    return [l.split("\t") for l in out if l.strip()]
+
+def pmtud_mechanism(cid):
+    pcap = os.path.join(LAB, f"pcap_pmtud_{cid}.pcapng")
+    if not os.path.exists(pcap):
+        return None
+    icmp = len(ts_fields(pcap, "icmp.type==3 && icmp.code==4", ["frame.number"]))
+    # chiều client->server trên leg egress (router 172.30.20.3 -> server)
+    egr = [int(r[0] or 0) for r in ts_fields(pcap, "ip.src==172.30.20.3 && tcp.len>0", ["tcp.len"])]
+    # chiều client->router (ingress): kích thước các gói lớn + số lần gửi lại
+    ing = ts_fields(pcap, "ip.src==172.30.10.3 && tcp.len>1000",
+                    ["tcp.len", "tcp.analysis.retransmission"])
+    big = [int(r[0]) for r in ing]
+    retr = sum(1 for r in ing if len(r) > 1 and r[1].strip() == "1")
+    return dict(icmp=icmp, egr=sorted(set(egr)), big=sorted(set(big)), retr=retr)
+
+m2 = pmtud_mechanism("c2_hyb_1280_allow")
+m1 = pmtud_mechanism("c1_hyb_1280_drop")
+okK2 = None
+if m1 and m2:
+    okK2 = (m2["icmp"] >= 1 and m1["icmp"] == 0
+            and 1393 in m2["big"] and len([x for x in m2["egr"] if x > 0]) >= 2
+            and max(m2["egr"] or [0]) <= 1228
+            and m1["big"] == [1393] and m1["retr"] >= 5 and not m1["egr"])
+    check("K2", "Cơ chế PMTUD trong pcap: ICMP ⇒ client tự chia lại ClientHello; chặn ICMP ⇒ gửi lại nguyên cỡ",
+          okK2,
+          f"ô CHO QUA: {m2['icmp']} ICMP, egress nhận các đoạn {m2['egr']} (≤ MSS 1228), ingress gửi {m2['big']} | "
+          f"ô CHẶN: {m1['icmp']} ICMP, ingress chỉ có {m1['big']} gửi lại {m1['retr']} lần, egress không có dữ liệu")
+else:
+    check("K2", "Cơ chế PMTUD trong pcap", None, "thiếu pcap c1/c2")
+
 # ---------------------------------------------------------------- CHECK L: đối chứng thứ tự
 oc = os.path.join(BASE, "tables", "order_control.json")
 if os.path.exists(oc):

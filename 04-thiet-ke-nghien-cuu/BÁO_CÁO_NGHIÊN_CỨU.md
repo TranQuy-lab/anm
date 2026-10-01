@@ -262,6 +262,13 @@ với kỳ vọng công suất ở n = 30 (chỉ phát hiện chắc chắn hi�
 mất gói làm phương sai tăng mạnh nên không đủ công suất). Kết luận đúng là: **mức tăng nhỏ,
 có thật, và không phải là một vòng RTT thêm**.
 
+**Kiểm định độ bền với hiệu chỉnh khắt khe hơn.** Toàn bộ 150 test (12 metric × 13 cấu hình) cũng
+được hiệu chỉnh Holm trong **một họ duy nhất** (khắt khe hơn nhiều so với Holm theo từng họ metric).
+Khi đó vẫn còn **78/150 test có ý nghĩa**, trong đó có chính các so sánh RTT: `hs_rtt` ở
+L0_D0_M576 (`p_holm_global` = 0,033), L0_D0_M1500 (0,041), L3_D50_M1280 (0,00085), và metric
+phân rã `rtt_ch_to_sv1` ở ba cấu hình (0,00012 / 0,0043 / 0,00005). Kết luận về RTT không phụ
+thuộc cách định nghĩa họ hiệu chỉnh.
+
 Phân rã RTT (mạng sạch) định vị chi phí:
 
 | MTU | CH → byte server đầu (X → PQC) | byte server cuối → flight-2 client |
@@ -332,6 +339,16 @@ chỉ nên so sánh **trong cùng một lần chạy**.
 | c7 | X25519 | 1500 | off | chặn | 6/6 | 0,56 s | 0 |
 | c8 | hybrid | **576** | off | chặn | **0/6** | 8,56 s | 0 |
 | c9 | X25519 | **576** | off | chặn | **0/6** | 8,59 s | 0 |
+
+**Cơ chế, nhìn trực tiếp trong pcap** (đây là phần bản v1 hoàn toàn thiếu):
+
+- Ô **c2** (ICMP cho qua): client gửi ClientHello **1393 B trong một segment** (khung 22) →
+  router phát **ICMP type 3 code 4** (khung 23) → **37 µs sau**, client gửi lại thành
+  **1228 + 165 = 1393 B** (khung 47–48 trên leg egress) → server trả lời → bắt tay hoàn tất
+  trong 0,56 s. Tức là ICMP đã được dùng đúng: client học PMTU và **tự chia lại** gói.
+- Ô **c1** (ICMP bị chặn): **0 gói ICMP** trong toàn bộ capture; client gửi lại **nguyên 1393 B
+  bảy lần** với backoff (14,15 → 14,36 → 14,77 → 15,62 → 17,28 → 20,54 → 35,40 s), không lần nào
+  tới được server, rồi timeout 8 s. Đây là blackhole PMTUD đúng nghĩa, có cả dấu vết backoff.
 
 Bốn kết luận:
 
@@ -426,7 +443,7 @@ Sau khi bản v2 hoàn tất, chúng tôi chạy **thêm một vòng phản bi�
    thêm **check C3** giải mã EncryptedExtensions.
 
 Kết quả audit tự động (`analysis/audit_kiemdinh.py`, output `tables/audit_results.csv`):
-**14/14 hạng mục PASS, 0 FAIL, 0 WARN** (bảng đầy đủ: `tables/audit_results.csv`):
+**15/15 hạng mục PASS, 0 FAIL, 0 WARN** (bảng đầy đủ: `tables/audit_results.csv`):
 
 | # | Lược kiểm | Kết quả |
 |---|---|---|
@@ -443,6 +460,7 @@ Kết quả audit tự động (`analysis/audit_kiemdinh.py`, output `tables/aud
 | I | Toàn vẹn thiết kế xen kẽ: hai nhóm cân bằng, xen kẽ | **PASS** — 30/30 mỗi cấu hình; lệch SYN trong cặp ~165 ms |
 | J | Phân mảnh cấp wire **tính lại từ pcap**; MTU có hiệu lực thật trên leg egress | **PASS** — client 1→1/1→2/1→3 và server 1→2/1→2/2→4 segment ở MTU 1500/1280/576; gói egress lớn nhất = MTU−52 |
 | K | PMTUD blackhole có kiểm soát | **PASS** — c1 0/6, c2–c7 6/6, c8 và c9 0/6 |
+| K2 | **Cơ chế PMTUD trong pcap**: ICMP ⇒ client tự chia lại ClientHello; chặn ICMP ⇒ gửi lại nguyên cỡ rồi treo | **PASS** — ô cho qua: 6 ICMP, egress nhận 1228+165 (≤ MSS); ô chặn: 0 ICMP, gửi lại nguyên 1393 B **36 lần**, egress không có dữ liệu |
 | L | Đối chứng thứ tự ngẫu nhiên: hiệu ứng nhóm tái lập; hiệu ứng vị trí **trong từng nhóm** nhỏ | **PASS** — Δnhóm +0,358/+0,331 ms (p ≈ 10⁻¹⁷); Δvị trí trong nhóm chỉ +0,012/−0,045 và +0,061/+0,066 ms |
 
 Ba hạng mục của bản v1 đã được **sửa vì chúng tự tham chiếu hoặc vô hiệu**:
