@@ -229,7 +229,31 @@ Vòng 4 xác minh các sửa của vòng 3 và tìm thêm:
 | `rq23` vẫn dùng `cl_ch_bytes` (đặc trưng bị GSO gộp) trong họ "bắt tay" | MINOR | Bỏ `cl_ch_bytes` khỏi họ bắt tay; kết quả không đổi (1,000 vs 0,167/0,160) |
 | Tiền lệ: GRO/TSO che cách chia packet của bắt tay đã được ghi nhận công khai; arXiv:2605.02978 có kịch bản fragmentation/coalescing cho TLS hậu lượng tử | — | Bổ sung vào tài liệu tham khảo và **thu hẹp tuyên bố**; thêm hạn chế "offload ở endpoint vẫn bật" |
 
-Sau vòng 4: audit **15/15 PASS**, checker **253 mục không sai lệch**.
+Sau vòng 4: audit **15/15 PASS**, checker không sai lệch.
+
+## 7c. Vòng phản biện thứ năm và thứ sáu — phán quyết cuối
+
+Hai vòng cuối tập trung vào **công cụ tự kiểm** và **phát biểu kết luận**, không còn lỗi số liệu cốt lõi:
+
+| Phát hiện | Mức | Đã sửa |
+|---|---|---|
+| §3.5 còn câu cũ "cần ≳1450 B" mâu thuẫn headline mới "≥1500 B" | MAJOR | Sửa; nêu rõ nút thắt là flight server (segment 1448 B + 52 B header) |
+| Khối kiểm **bảng drift** của checker là **code chết** (khoá tra cứu sai) ⇒ 8 ô chưa từng được kiểm | MAJOR | Dùng tiền tố; kiểm đủ 4 dòng; kiểm âm xác nhận 4/4 bắt được |
+| Báo cáo/README tự mô tả sai số mục (199 trong khi script kiểm 253) | MAJOR | Nay **294 mục** và checker **tự kiểm số mục** trên cả hai tệp |
+| **Hạn chế #1 sai** ("ngưỡng chỉ giới hạn được chiều client→server") | MAJOR | Viết lại: panel (b) đối xứng đo được **chiều về** |
+| K2 ô c9 tiêu chí **gần rỗng** (PASS cả khi server không gửi gì) | MAJOR | Thêm bằng chứng **server đã phát**: seq tiêu thụ 769 B theo từng kết nối (c8 = 1 B, đối chứng) |
+| **Thiếu tiền lệ đúng hiện tượng** | MAJOR | Bổ sung golang/go **#80573** (26/7/2026), luồng **IETF TLS WG 2/2026**, **RFC 7685** (đã xác minh trực tiếp); §1.3 nay có **ba tầng tiền lệ** và thu hẹp đóng góp |
+| Không kiểm cột quyết định của Bảng 5, số nguyên dòng audit I, số học §3.5 (13 điểm mù) | MINOR–MAJOR | Checker nay **tính lại** ngưỡng từ dữ liệu (1445 = 1393+52; 1500 = 1448+52; 821 = 769+52; bracket 1440/1448 và 1460/1500) và **ghim câu scoping** |
+| Phát biểu ngưỡng **rộng hơn cấu hình**: Bảng 5(a) dòng 1448 qua được trong khi headline nói "cần 1500 B" | (phản đối mạnh nhất còn lại) | Đã **scope theo chiều**: "bắt tay cần PMTU ≥ **max(1445 B chiều đi, 1500 B chiều về)**", và giải thích dòng 1448 không mâu thuẫn (nút thắt chỉ ở chiều đi) |
+| Thí nghiệm ngưỡng chỉ **3 lần thử/ô** | MINOR | Nêu thành Hạn chế #7 kèm lý do ngưỡng vẫn xác định (số học tất định) |
+| Wording: "MSS 1460" vs segment 1448 B; c9 "767 B" vs median 768 B; header script copy-paste | TRIVIAL | Đã sửa |
+
+**Phán quyết của vòng 6 (nguyên văn tóm tắt):** *"CRITICAL: NONE. No remaining issue would
+invalidate a headline result... Ready for a supervisor? YES — as a lab-measurement study with its
+stated limitations."* Các kết quả được xác nhận độc lập từ dữ liệu thô: ngân sách byte/FIPS 203,
+phân mảnh cấp wire, blackhole PMTUD và ngưỡng theo chiều, hiệu ứng RTT (sign test 0,0112/0,0225;
+4/13 sau Holm theo họ; 81/156 sau Holm toàn cục), và ranh giới quan sát (1,000 vs 0,590/0,580;
+luật packet đầu 0,5 ở MTU 576 vs luật tổng byte 1,000 ở mọi MTU).
 
 ## 8. Bảng đối chiếu v1 → v2
 

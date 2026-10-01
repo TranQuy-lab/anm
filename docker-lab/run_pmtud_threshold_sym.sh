@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run_pmtud_threshold_sym.sh — QUÉT NGƯỠNG trên ĐƯỜNG ĐỐI XỨNG (MTU_A = MTU_B).
 #
-# Câu hỏi: tuyên bố "PQC dịch ngưỡng an toàn từ ~820 B lên ~1450 B" có đo được không?
+# Câu hỏi: nút thắt thật của bắt tay hybrid là ClientHello (chiều đi) hay flight server (chiều về)?
 # Thiết kế: giữ MTU_A=1500 (để router là điểm nghẽn cho chiều client→server, xem run_pmtud.sh),
 # quét MTU_B ∈ {900, 1200, 1400, 1440, 1448} × {X25519, X25519MLKEM768}, CLAMP=off,
 # DROP_ICMP_FRAG=1, 3 lần thử mỗi ô. ClientHello hybrid là 1393 B ⇒ cần MTU_B ≥ 1393+52 = 1445;

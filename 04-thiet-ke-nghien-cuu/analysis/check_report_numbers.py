@@ -324,6 +324,38 @@ def main():
             f"rq2b MTU {mtu}: accuracy tổng byte = {r['threshold_800_client_flight_acc']:.3f}, báo cáo nói {exp_fl}")
     chk("0,5 ở MTU 576" in s or "chỉ 0,5 ở MTU 576" in s, "Thiếu câu về accuracy 0,5 ở MTU 576")
 
+    # ---------- §3.5: TÍNH LẠI số học ngưỡng từ dữ liệu (vá 13 điểm mù) ----------
+    Asym = pd.read_csv(os.path.join(LAB, "pmtud_threshold.csv"))
+    Sym = pd.read_csv(os.path.join(LAB, "pmtud_threshold_sym.csv"))
+    def rate(D, mtu, grp):
+        q = D[(D.mtu_b == mtu) & (D.group == grp)]
+        return (q.established.mean(), len(q)) if len(q) else (float("nan"), 0)
+    ch_pkt = int(med("cl_ch_bytes", "X25519MLKEM768")) + 52          # 1393 + 52
+    chk(ch_pkt == 1445 and "1445" in s, f"§3.5: ClientHello cần {ch_pkt} B (báo cáo phải nêu 1445)")
+    # segment đầu chiều về tại MTU 1500 (đo trên pcap egress)
+    head = None
+    f1500 = os.path.join(LAB, "pcap_thr_1500_X25519MLKEM768.pcapng")
+    if os.path.exists(f1500):
+        # đoạn 1448 B nằm trên leg EGRESS về client (ip.src = router phía client); trên leg
+        # ingress từ server, flight xuất hiện dưới dạng GSO super-frame 1844/1845
+        out = subprocess.run(["tshark", "-r", f1500, "-Y", "ip.src==172.30.10.2 && tcp.len>0",
+                              "-T", "fields", "-e", "tcp.len"], capture_output=True, text=True).stdout
+        segs = [int(x) for x in out.split() if x.strip().isdigit()]
+        head = max(segs) if segs else None
+    chk(head == 1448 and "1448" in s, f"§3.5: segment đầu chiều về phải là 1448 (đo được {head})")
+    chk((head or 0) + 52 == 1500 and "1500" in s, "§3.5: nút thắt chiều về = 1448 + 52 = 1500")
+    # c9: seq server tiến 769 ⇒ 1 SYN + 768 dữ liệu
+    chk("769" in s and "768" in s, "§3.5: c9 phải nêu seq tiến 769 B và 768 B dữ liệu")
+    # bracket từ CSV: hybrid hỏng 1440/qua 1448 (asym), hỏng 1460/qua 1500 (sym)
+    for D, lo, hi in ((Asym, 1440, 1448), (Sym, 1460, 1500)):
+        a0, n0 = rate(D, lo, "X25519MLKEM768"); a1, n1 = rate(D, hi, "X25519MLKEM768")
+        chk(a0 == 0.0 and a1 == 1.0, f"§3.5: bracket hybrid {lo}→{hi} không khớp dữ liệu ({a0}/{a1})")
+    # X25519: 769 + 52 = 821
+    chk(769 + 52 == 821 and "821" in s, "§3.5: ngưỡng X25519 = 769 + 52 = 821")
+    # câu SCOPING phải ghim CẢ HAI con số (nếu chỉ đòi "có mặt", sửa một chỗ sẽ lọt)
+    chk(f"max({ch_pkt} B chiều đi, {(head or 0) + 52} B chiều về)" in s,
+        f"§3.5: câu scoping phải ghi đúng 'max({ch_pkt} B chiều đi, {(head or 0) + 52} B chiều về)'")
+
     # ---------- số trong văn xuôi ----------
     prose = [
         ("0,17–0,44 ms", "khoảng Δ RTT", r"0,17–0,44 ms"),
@@ -346,7 +378,7 @@ def main():
 
     n_final = n + 1
     readme = open(os.path.join(BASE, "..", "..", "README.md"), encoding="utf-8").read()
-    chk(f"{n_final} mục" in s or f"{n_final} mục" in readme,
+    chk(f"{n_final} mục" in s and f"{n_final} mục" in readme,
         f"Số mục tự mô tả: script kiểm {n_final} mục nhưng báo cáo/README không nêu '{n_final} mục'")
     print(f"Đã đối chiếu {n_final} mục giữa báo cáo và dữ liệu thô.")
     if errs:

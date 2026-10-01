@@ -51,9 +51,10 @@ Bốn kết quả chính:
    pcap: hybrid là blackhole PMTUD (0 ICMP, ClientHello không tới server), còn X25519 là **drop
    im lặng ở chiều server→client trước router**. Rủi ro thuộc về *kích thước vượt PMTU*, không
    phải đặc quyền của PQC. Cuối cùng, **ngưỡng PMTU an toàn được đo trực tiếp**: ClientHello
-   hybrid cần ≥ 1445 B, nhưng trên đường có nút thắt giữa nhỏ hơn MTU của endpoint, bắt tay
-   hybrid chỉ thành công từ **1500 B** (vì flight server bị chia theo MSS 1460 thành gói 1500 B),
-   trong khi X25519 sống từ ≈ 821 B (820 B là biên).
+   ClientHello hybrid cần ≥ 1445 B, nhưng khi nút thắt nằm ở **chiều về** thì bắt tay chỉ thành
+   công từ **1500 B** (flight server: segment 1448 B + 52 B header). Nói gọn: bắt tay cần
+   **PMTU ≥ max(1445 chiều đi, 1500 chiều về)**; X25519 chỉ cần ≈ 821 B. Vì vậy ở Bảng 5(a) dòng
+   1448 B vẫn qua — nút thắt 1448 B của lab chỉ nằm ở chiều đi, còn chiều về rộng 1500 B.
 
 **Về khả năng nhận dạng lưu lượng:** chúng tôi **không** tuyên bố tính mới — quan sát thụ động
 phân biệt cổ điển/hậu lượng tử đã được công bố (arXiv:2503.17830; ePrint 2026/834;
@@ -389,11 +390,16 @@ ICMP frag-needed bị chặn, 3 lần thử mỗi ô; pcap có cho mọi ô ở 
 PMTU ≥ **1445 B** (hỏng ở 1440, qua ở 1448). Nhưng ở 1445 và 1460 — nơi ClientHello **đã qua
 được** (một segment 1393 B) — bắt tay **vẫn hỏng**: nút thắt là **chiều về**, vì flight server
 1845 B bị chia theo MSS 1460 (endpoint vẫn tưởng MTU của mình là 1500) thành các gói 1500 B,
-vượt PMTU. Chỉ từ **1500 B** cả hai chiều mới vừa. Vậy:
+vượt PMTU (MSS danh nghĩa 1460 B, nhưng segment quan sát được là **1448 B** dữ liệu vì header
+TCP 32 B có timestamp). Chỉ từ **1500 B** cả hai chiều mới vừa. Vậy:
 
-> Trên đường có nút thắt giữa nhỏ hơn MTU của endpoint, **bắt tay hybrid cần PMTU ≥ 1500 B**,
-> còn **X25519 cần ≥ 821 B** (ở 820 B chỉ 2/3 vì lần hỏng có flight 769 B ⇒ 769 + 52 = 821 > 820; 3/3 từ 1200 B). Tức PQC dịch ngưỡng an toàn từ
-> **~820 B lên ~1500 B** — bao trùm cả MTU tối thiểu của IPv6 (1280 B) và phần lớn đường VPN/tunnel.
+> **Ngưỡng phụ thuộc CHIỀU.** Trên đường có nút thắt giữa nhỏ hơn MTU của endpoint, bắt tay
+> hybrid cần **PMTU ≥ max(1445 B chiều đi, 1500 B chiều về)**; **X25519 chỉ cần ≥ 821 B**
+> (ở 820 B chỉ 2/3 vì lần hỏng có flight 769 B ⇒ 769 + 52 = 821 > 820; 3/3 từ 1200 B). Dòng
+> 1448 B ở Bảng 5(a) **không** mâu thuẫn với mức 1500 B: ở đó nút thắt chỉ nằm ở **chiều đi**,
+> còn chiều về rộng 1500 B. Nói chính xác: PQC dịch ngưỡng an toàn **của chiều đi** từ ~269 B
+> (ClientHello X25519) lên **1445 B**, và **của chiều về** lên **1500 B** — mức 1500 B bao trùm
+> MTU tối thiểu của IPv6 (1280 B) và phần lớn đường VPN/tunnel.
 
 *(Ghi chú vận hành: sweep đối xứng chạy sau đã ghi đè pcap cùng tên của sweep bất đối xứng ở các
 MTU trùng nhau; vì vậy tỉ lệ hoàn tất luôn lấy từ CSV kết quả, còn dữ liệu hướng chỉ lấy từ pcap
@@ -424,7 +430,8 @@ Bốn kết luận:
      6 lần/lần thử, **0 gói ICMP**.
    - **c9 (X25519, 576)** hỏng vì hướng server→client vượt MTU **trước điểm capture**. Bằng chứng
      trực tiếp trong pcap: ClientHello 217 B **đã tới server**; không gian `seq` mà server tiêu
-     thụ (trung vị theo từng kết nối) là **769 B**, tức server **đã phát** flight 767 B của nó;
+     thụ (trung vị theo từng kết nối) là **769 B** = 1 B cho SYN + **768 B dữ liệu**, tức server
+     **đã phát** flight ~768 B của nó;
      nhưng **không byte dữ liệu nào của server tới được client** (18 khung từ server đều là ACK
      `tcp.len = 0`) và **0 gói ICMP** ⇒ **drop im lặng**, không phải PMTUD.
    Các cột c1–c7 và đối chứng thứ tự không bị ảnh hưởng. Điều rút ra vẫn đúng: rủi ro thuộc về
@@ -568,7 +575,10 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 5. **PMTUD**: mới ở PMTU 1280/1500/576 với một kiểu NAT (DNAT 1-1). Chưa đo ảnh hưởng của
    nhiều lớp NAT, IPv6, hay middlebox thật.
 6. **Không đo throughput lớn**: 6 site tổng hợp, không phải lưu lượng thật.
-7. **Sự cố vận hành ảnh hưởng phạm vi bằng chứng:** sweep đối xứng chạy sau đã **ghi đè pcap cùng
+7. **Thí nghiệm ngưỡng chỉ 3 lần thử/ô** (khác ma trận n = 30): các ô 0/3 và 3/3 có khoảng tin cậy
+   nhị thức rộng (±0,4 ở 95%). Riêng **ngưỡng** vẫn xác định: nó là số học (1445 = 1393 + 52;
+   1500 = 1448 + 52), và các ô biên 1440/1448 (bất đối xứng) và 1460/1500 (đối xứng) đều nhất quán.
+8. **Sự cố vận hành ảnh hưởng phạm vi bằng chứng:** sweep đối xứng chạy sau đã **ghi đè pcap cùng
    tên** của sweep bất đối xứng ở các MTU trùng nhau (1200, 1400). Với hai MTU đó chỉ còn **tỉ lệ
    hoàn tất** (từ CSV), không còn pcap để kiểm hướng; mọi suy luận về hướng chỉ dựa trên các MTU
    còn pcap. Ánh xạ được ghi tường minh trong `analysis/pmtud_threshold.py`.
@@ -649,7 +659,7 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 | Trích xuất per-packet | `analysis/packets_all.tsv` (≈402 nghìn dòng) |
 | Phân tích | `analysis/rq1_analysis.py`, `rq23_analysis.py`, `rq2b_group_classifier.py`, `order_control.py`, `check_ch_budget.py` |
 | Kiểm định chéo | `analysis/audit_kiemdinh.py` → `tables/audit_results.csv` |
-| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (**286 mục**: Bảng 1–5, phân rã RTT, đối chứng thứ tự, bảng audit, số trong văn xuôi; thoát mã 1 nếu lệch) |
+| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (**294 mục**: Bảng 1–5, phân rã RTT, đối chứng thứ tự, bảng audit, số trong văn xuôi; thoát mã 1 nếu lệch) |
 | Ngưỡng PMTU đo được | `docker-lab/run_pmtud_threshold.sh` → `analysis/pmtud_threshold.py`, `tables/pmtud_threshold.json` |
 | Hồ sơ kiểm chứng | `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md` |
 | Sinh PDF | `analysis/md2pdf_report.py` |
