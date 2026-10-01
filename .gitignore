@@ -1,4 +1,11 @@
-# Dữ liệu thô tái tạo bằng docker-lab/run_matrix.sh; bản gốc lưu trong commit 7717a72
-docker-lab/results/pcap_*.pcapng
+# Dữ liệu thô tái tạo được bằng docker-lab/run_matrix2.sh, run_pmtud.sh, run_ch_budget.sh
+# và analysis/extract_metrics.sh. Bản v1 (capture bị GSO che) nằm ở
+# docker-lab/results/archive_gso_capture/ và trong lịch sử git (commit 7717a72).
+docker-lab/results/pcap*.pcapng
+docker-lab/results/archive_gso_capture/
+docker-lab/results/keys*.log
 docker-lab/results/sniff*.txt
+docker-lab/results/cap*.pcapng
 04-thiet-ke-nghien-cuu/analysis/packets_all.tsv
+04-thiet-ke-nghien-cuu/analysis/packets_all_gso.tsv
+__pycache__/

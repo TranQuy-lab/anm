@@ -40,12 +40,20 @@ MARGIN = 2.0 * cm
 AVAIL = PAGE_W - 2 * MARGIN
 
 def inline(md: str) -> str:
-    t = html.escape(md)
+    # Code span phải được TÁCH RA TRƯỚC khi xử lý *italic*: nếu không, dấu * trong
+    # `pcap2_*.pcapng` bị hiểu thành mở/đóng italic và ReportLab báo lỗi parse.
+    codes = []
+    def stash(m):
+        codes.append(m.group(1))
+        return f"\x00{len(codes)-1}\x00"
+    t = re.sub(r"`([^`]+)`", stash, md)
+    t = html.escape(t)
     t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
     t = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", t)
-    t = re.sub(r"`([^`]+)`", r'<font face="DejaVu-Mono" size="8.6">\1</font>', t)
     t = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1", t)   # link → chỉ giữ text
-    return t
+    def restore(m):
+        return '<font face="DejaVu-Mono" size="8.6">%s</font>' % html.escape(codes[int(m.group(1))])
+    return re.sub(r"\x00(\d+)\x00", restore, t)
 
 def table_flow(rows):
     ncol = max(len(r) for r in rows)

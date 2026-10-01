@@ -1,8 +1,10 @@
 # Bản đồ y văn — An ninh mạng / Mã hóa / Lỗ hổng (cắt cạnh 2024–2026)
 
-> Ngày khảo sát: 2026-10-01. Phương pháp: truy vấn đa nguồn (arXiv, ScienceDirect, MDPI, USENIX,
-> IETF/CSA) theo quy trình literature-review (skill giáo sư). Mỗi nhận định dưới đây gắn với nguồn;
-> phần suy luận của agent được ghi rõ là "suy luận".
+> Ngày khảo sát: 2026-10-01. **Đã cập nhật sau kiểm chứng chéo** (xem
+> `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md`): sáu công trình tiền lệ được bổ sung và nhiều
+> chi tiết trích dẫn được sửa. Phương pháp: truy vấn đa nguồn (arXiv, ScienceDirect, MDPI, USENIX,
+> IETF/CSA) theo quy trình literature-review. Mỗi nhận định dưới đây gắn với nguồn; phần suy luận
+> của agent được ghi rõ là "suy luận".
 
 ## 1. Lưu lượng mã hóa & khả năng quan sát mạng (thiên hướng chính: MẠNG)
 
@@ -20,16 +22,23 @@
 
 | Nguồn | Nội dung cốt lõi | Khoảng trống nó hé lộ |
 |---|---|---|
-| **arXiv:2608.22683 (8/2026) "The Colossus with Feet of Clay"** | Chẩn đoán: PQC drift (X25519 → X25519MLKEM768 trong TLS 1.3) làm sụt accuracy của classifier đã huấn luyện | Họ chỉ **chẩn đoán**, chưa có (a) đo lường tác động mạng, (b) QUIC, (c) giải pháp thích ứng, (d) dataset công khai |
-| NIST FIPS 203/204/205 (ML-KEM/ML-DSA/SLH-DSA) | Chuẩn hóa PQC hoàn tất | Áp lực chuyển đổi thực tế: NIST IR 8547 khử RSA/ECC khỏi FIPS |
-| IETF "PQC for Engineers" (5/2025) | IKEv2 fragmentation lỗi ở IKE_SA_INIT; hybrid trong TLS 1.3 (draft-ietf-tls-hybrid-design) | Vấn đề MTU/fragmentation network-level chưa đo hệ thống |
-| arXiv (handshake-size study) | Chuỗi chứng chỉ PQC làm handshake tăng 5×–20× | Tác động lên đường truyền mất gói/trễ chưa được định lượng đầy đủ |
-| Raspberry Pi 4 benchmark (Semantic Scholar/RG) | ML-KEM-512: ~58µs enc / 51µs dec → tính toán KHÔNG phải nút thắt | Nút thắt nằm ở **mạng**, không phải CPU → đúng trọng tâm nghiên cứu mạng |
-| CSA guidance | MTU drop → fragmentation/segmentation cho handshake lớn | Thiếu mô hình thực nghiệm có kiểm soát (controlled testbed) |
+| **arXiv:2608.22683 (8/2026) "The Colossus with Feet of Clay"** | Benchmark website-fingerprinting cặp Non-PQC/Hybrid-PQC (X25519MLKEM768); accuracy sụp khi cross-domain | Họ làm **fingerprinting**, không làm mạng; chưa đo PMTUD/MTU |
+| **arXiv:2503.17830 (3/2025, sửa 1/2026)** | Phân loại cổ điển vs PQ **98–100%**; nhận dạng đúng thuật toán PQ 97% (KEX); phân biệt liboqs/CIRCL; áp dụng TLS/SSH/QUIC/OpenVPN/OIDC; tìm domain PQC trong Tranco | ⇒ **không thể tuyên bố "đầu tiên"** về fingerprint PQC |
+| **IACR ePrint 2026/834 (5/2026)** | Đọc key_share ở mức byte trong ServerHello; phân loại CLASSICAL_ONLY/PQC_ONLY/HYBRID_CONFIRMED; xác nhận nhóm 0x11EC trên 38 endpoint thật | Như trên |
+| **arXiv:2604.24869 (4/2026)** | Handshake tăng 5×–20× (chuỗi chứng chỉ); TTFB theo **giới hạn flight** tầng vận chuyển; Merkle Tree Certificates | Đã chạm MTU/flight limit ⇒ không tuyên bố "đầu tiên đo tác động mạng" |
+| **arXiv:2603.11006 (3/2026, SPIQE @ EuroS&P)** | Đo TLS 1.3 theo từng tầng (TCP, TCP-TLS, TLS, TLS-HTTP, HTTP) cho cổ điển/lai/thuần PQC, 30+ thí nghiệm | Như trên |
+| **ePrint 2019/1447 (PQCrypto 2020)** | Mạng giả lập: mất gói >3–5% hại nặng thuật toán PQC phải phân mảnh | Đã biết từ 2019 |
+| **RFC 9954 (7/2026)** / **RFC 9958 (6/2026)** | Chuẩn hóa hybrid key exchange cho TLS 1.3 / hướng dẫn kỹ sư PQC. RFC 9954 §4 nói rõ ML-KEM *"may result in ClientHello messages larger than a single packet"* | **Chưa ai đo hệ quả vận hành của việc đó** — đây là khoảng trống T1 khai thác |
+| NIST FIPS 203/204/205 (8/2024); NIST IR 8547 (**draft**, 11/2024) | Chuẩn hóa PQC hoàn tất | Áp lực chuyển đổi thực tế |
+| Nagy et al., *Sci* 7(3):91 (2025) | ML-KEM trên Raspberry Pi 4B: KeyGen 65,6 / Encap 79,8 / Decap 103,8 µs (liboqs) | Tính toán KHÔNG phải nút thắt — **lưu ý: con số 58/51 µs mà bản v1 gán cho Pi 4 thực ra là đo trên Intel Xeon E5-2680 v4** (ePrint 2026/1467) |
+| CSA guidance; IETF PQC for Engineers | MTU drop → phân mảnh cho handshake lớn | Thiếu mô hình thực nghiệm có kiểm soát, đặc biệt khi ICMP bị lọc |
 
-**Suy luận then chốt (agent):** cộng đồng đã thống nhất "PQC nhanh về CPU, nặng về mạng" nhưng
-chưa có pipeline thực nghiệm công khai đo (kích thước handshake → phân mảnh → mất gói → RTT/throughput)
-và đồng thời đánh giá hệ quả nhận dạng lưu lượng + biện pháp thích ứng. Đây là lỗ hổng nghiên cứu.
+**Suy luận then chốt (agent, đã thu hẹp sau kiểm chứng chéo):** cộng đồng đã thống nhất
+"PQC nhanh về CPU, nặng về mạng", và **đã có** công trình đo hiệu năng mạng (2603.11006,
+2604.24869), **đã có** công trình fingerprint PQC (2503.17830, ePrint 2026/834, 2608.22683).
+Khoảng trống **còn thật sự mở** — sau khi tìm nhiều truy vấn khác nhau mà không thấy công trình
+nào làm — là: **hành vi PMTUD/ICMP-blackhole của bắt tay PQC khi ICMP "fragmentation needed"
+bị lọc**, và **đo tỉ lệ blackhole ngoài Internet thật**. Đây là chỗ đề tài T1 đặt đóng góp.
 
 ## 3. IDS / phát hiện tấn công mạng
 

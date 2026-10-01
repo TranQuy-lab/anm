@@ -1,4 +1,80 @@
 {
-  "n_flows": 59,
-  "acc_1feat_first_pkt": 1.0
+  "n_flows": 780,
+  "by_mtu": {
+    "576": {
+      "n_X25519": 30,
+      "n_MLKEM768": 30,
+      "first_pkt_median_X": 217.0,
+      "first_pkt_median_PQC": 1393.0,
+      "client_flight_bytes_median_X": 297.0,
+      "client_flight_bytes_median_PQC": 1473.0,
+      "server_flight_bytes_median_X": 767.0,
+      "server_flight_bytes_median_PQC": 1845.0,
+      "ch_segments_median_X": 1.0,
+      "ch_segments_median_PQC": 3.0,
+      "threshold_800_first_pkt_acc": 1.0,
+      "threshold_800_client_flight_acc": 1.0
+    },
+    "1280": {
+      "n_X25519": 180,
+      "n_MLKEM768": 180,
+      "first_pkt_median_X": 217.0,
+      "first_pkt_median_PQC": 1393.0,
+      "client_flight_bytes_median_X": 297.0,
+      "client_flight_bytes_median_PQC": 1473.0,
+      "server_flight_bytes_median_X": 767.0,
+      "server_flight_bytes_median_PQC": 1845.0,
+      "ch_segments_median_X": 1.0,
+      "ch_segments_median_PQC": 2.0,
+      "threshold_800_first_pkt_acc": 1.0,
+      "threshold_800_client_flight_acc": 1.0
+    },
+    "1500": {
+      "n_X25519": 180,
+      "n_MLKEM768": 180,
+      "first_pkt_median_X": 217.0,
+      "first_pkt_median_PQC": 1393.0,
+      "client_flight_bytes_median_X": 297.0,
+      "client_flight_bytes_median_PQC": 1473.0,
+      "server_flight_bytes_median_X": 767.0,
+      "server_flight_bytes_median_PQC": 1845.0,
+      "ch_segments_median_X": 1.0,
+      "ch_segments_median_PQC": 1.0,
+      "threshold_800_first_pkt_acc": 1.0,
+      "threshold_800_client_flight_acc": 1.0
+    }
+  },
+  "mtu_invariance": {
+    "first_packet_sizes_by_mtu": {
+      "576": [
+        217.0,
+        1393.0
+      ],
+      "1280": [
+        217.0,
+        1393.0
+      ],
+      "1500": [
+        217.0,
+        1393.0
+      ]
+    },
+    "client_flight_bytes_by_mtu": {
+      "576": [
+        297.0,
+        1473.0
+      ],
+      "1280": [
+        297.0,
+        1473.0
+      ],
+      "1500": [
+        297.0,
+        1473.0
+      ]
+    },
+    "first_packet_invariant": true,
+    "client_flight_invariant": true
+  },
+  "prior_art_note": "Việc quan sát thụ động phân biệt được cổ điển vs hậu lượng tử ĐÃ được công bố: arXiv:2503.17830 (Mallick et al., 2025/2026, 98-100% cho nhiều giao thức, có cả TLS/QUIC), IACR ePrint 2026/834 (đọc key_share ServerHello, 38 endpoint thật), arXiv:2608.22683 (đo drift trace khi bật X25519MLKEM768). Đóng góp ở đây KHÔNG phải tính mới của khả năng fingerprint, mà là: (i) định lượng đặc trưng tối thiểu cần thiết, (ii) kiểm bền theo MTU/phân mảnh."
 }

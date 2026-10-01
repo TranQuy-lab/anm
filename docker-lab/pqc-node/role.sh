@@ -38,16 +38,43 @@ case "$ROLE" in
     if [ -z "${SERVER_IP}" ]; then echo "[router] THIẾU SERVER_IP (DNS môi trường không hoạt động) — abort"; exit 3; fi
     iptables -t nat -A PREROUTING -i "$IF_A" -p tcp --dport 4433 -j DNAT --to-destination "${SERVER_IP}:4433"
     iptables -t nat -A POSTROUTING -o "$IF_B" -p tcp -d "$SERVER_IP" --dport 4433 -j MASQUERADE
-    # MSS clamp: mô phỏng PMTUD hoạt động đúng (endpoint không bao giờ vượt MTU đường truyền).
-    # Không có clamp, ICMP frag-needed bị môi trường sandbox chặn → blackhole (bản thân nó
-    # là một hiện tượng thật của PQC handshake, được ghi nhận riêng trong báo cáo).
-    iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null \
-      || echo "[router] CẢNH BÁO: TCPMSS không khả dụng — kịch bản MTU sẽ là blackhole PMTUD"
+    # Offload: BẮT BUỘC tắt GSO/TSO/GRO trên NIC ảo. Nếu không, gói lớn hơn MTU vẫn được truyền
+    # nguyên khối qua veth (GSO passthrough) và MTU mô phỏng trở nên vô hiệu — lỗi độ trung thực
+    # được phát hiện trong kiểm chứng chéo (xem 07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md).
+    # MTU: mặc định đặt CẢ HAI phía bằng MTU (mô hình đường truyền đồng nhất).
+    # MTU_A/MTU_B cho phép đặt lệch: thí nghiệm PMTUD cần MTU_A=1500 và MTU_B nhỏ
+    # để ROUTER là điểm nghẽn thật (nếu đặt nhỏ cả hai phía, gói lớn bị chặn ngay ở
+    # bridge/veth phía host TRƯỚC khi tới router → phép can thiệp ICMP mất tác dụng).
     for IF in "$IF_A" "$IF_B"; do
-      ip link set "$IF" mtu "${MTU:-1500}"
+      if [ "$IF" = "$IF_A" ]; then
+        ip link set "$IF" mtu "${MTU_A:-${MTU:-1500}}"
+      else
+        ip link set "$IF" mtu "${MTU_B:-${MTU:-1500}}"
+      fi
+      if command -v ethtool >/dev/null 2>&1; then
+        ethtool -K "$IF" tso off gso off gro off tx off rx off 2>/dev/null \
+          || echo "[router] CẢNH BÁO: không tắt được offload trên $IF"
+      else
+        echo "[router] CẢNH BÁO: thiếu ethtool — MTU có thể bị GSO che"
+      fi
       tc qdisc replace dev "$IF" root netem delay "${DELAY:-0ms}" loss "${LOSS:-0%}"
     done
-    echo "[router] sẵn sàng: $IF_A (client-side) <-> $IF_B (server-side -> $SERVER_IP), loss=${LOSS:-0} delay=${DELAY:-0} mtu=${MTU:-1500}"
+    # CLAMP=on (mặc định): mô phỏng PMTUD hoạt động (endpoint không vượt MTU đường truyền).
+    # CLAMP=off: để endpoint gửi gói lớn hơn PMTU — dùng cho thí nghiệm PMTUD blackhole.
+    if [ "${CLAMP:-on}" = "on" ]; then
+      iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null \
+        || echo "[router] CẢNH BÁO: TCPMSS không khả dụng"
+    else
+      echo "[router] CLAMP=off — không clamp MSS (PMTUD phải tự xử lý)"
+    fi
+    # DROP_ICMP_FRAG=1: chặn ICMP 'fragmentation needed' do chính router phát ra (OUTPUT)
+    # → mô phỏng middlebox/firewall lọc ICMP. Kết hợp CLAMP=off tạo PMTUD blackhole.
+    if [ "${DROP_ICMP_FRAG:-0}" = "1" ]; then
+      iptables -A OUTPUT -p icmp --icmp-type fragmentation-needed -j DROP
+      iptables -A FORWARD -p icmp --icmp-type fragmentation-needed -j DROP
+      echo "[router] DROP_ICMP_FRAG=1 — ICMP type 3 code 4 bị chặn"
+    fi
+    echo "[router] sẵn sàng: $IF_A (client-side) <-> $IF_B (server-side -> $SERVER_IP), loss=${LOSS:-0} delay=${DELAY:-0} mtu=${MTU:-1500} clamp=${CLAMP:-on} drop_icmp=${DROP_ICMP_FRAG:-0}"
     tail -f /dev/null | sleep infinity & wait
     ;;
   *) echo "dùng: role.sh server|client|router"; exit 1 ;;

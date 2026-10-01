@@ -104,3 +104,25 @@
 > trong ngày 2026-10-01, không phải xác suất khách quan. Ngưỡng 95% chỉ đạt khi mỗi vòng hỏi
 > đều có bằng chứng hoặc kế hoạch giảm rủi ro cụ thể — đúng tinh thần của skill peer-review:
 > "không được tuyên bố tính mới chỉ vì tìm kiếm nhanh không thấy gì".
+
+---
+
+## Cập nhật v2 — kiểm chứng chéo **kết quả** (khác với kiểm chéo **đề tài** ở trên)
+
+Các vòng ở trên chấm điểm **việc chọn đề tài** và kết thúc trước khi có dữ liệu. Sau khi có kết
+quả, một vòng kiểm chứng độc lập khác đã được chạy trên chính repo (một agent phản biện như
+reviewer + một agent xác minh y văn). Vòng đó tìm ra các vấn đề **không** được phủ bởi 5 vòng
+chọn đề tài:
+
+| Phát hiện | Mức | Ý nghĩa cho quy trình |
+|---|---|---|
+| Kiểm định cặp ghép không hợp lệ (hai nhóm chạy khối tuần tự) làm **đảo** kết luận chính về RTT | CRITICAL | Kiểm chéo đề tài không thể thay kiểm chéo **phân tích** — cần một vòng riêng sau khi có số |
+| MTU bị GSO/TSO che ⇒ chiều "MTU" của ma trận v1 đo sai thứ nó tuyên bố đo | CRITICAL | "Thiết kế đúng trên giấy" ≠ "lab thực thi đúng"; phải có phép kiểm độ trung thực (ở đây: đo `max(tcp.len)` so với MTU) |
+| "PMTUD blackhole có kiểm soát" không có thao tác kiểm soát nào trong code | CRITICAL | Mọi tuyên bố nhân quả phải truy được về một thao tác cụ thể + bằng chứng ghi được |
+| Kiểm tra "khớp FIPS 203" tự quy chiếu ("lý thuyết ≈1176") | CRITICAL | Phép kiểm phải có hằng số **độc lập** với dữ liệu (ở đây: ek 1184 / ct 1088) |
+| **6 công trình tiền lệ** chiếm mất tuyên bố "đầu tiên" | — | Vòng 1 (tính mới) chỉ tìm được 1 tiền lệ; tìm kỹ hơn thấy 6 ⇒ phải **định vị lại**, không đổi đề tài |
+
+**Kết luận quy trình (đáng giữ lại):** kiểm chéo đề tài và kiểm chéo kết quả là hai việc khác
+nhau, và cả hai đều phải làm. Mức tự tin 96% ở trên vẫn đúng với câu hỏi "có nên làm đề tài
+này không"; nó **không** nói gì về chất lượng thực thi. Hồ sơ đầy đủ:
+`07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md`.

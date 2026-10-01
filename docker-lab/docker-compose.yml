@@ -29,6 +29,8 @@ services:
       - ./pqc-node/role.sh:/usr/local/bin/role.sh:ro
       - ./pqc-node/hs_loop.sh:/usr/local/bin/hs_loop.sh:ro
       - ./pqc-node/sites_loop.sh:/usr/local/bin/sites_loop.sh:ro
+      - ./pqc-node/hs_loop2.sh:/usr/local/bin/hs_loop2.sh:ro
+      - ./pqc-node/sites_loop2.sh:/usr/local/bin/sites_loop2.sh:ro
     networks: [labnet]
     mem_limit: 512m
     cpus: "1.0"
@@ -46,6 +48,10 @@ services:
       - LOSS=${LOSS:-0}
       - DELAY=${DELAY:-0}
       - MTU=${MTU:-1500}
+      - MTU_A=${MTU_A:-}
+      - MTU_B=${MTU_B:-}
+      - CLAMP=${CLAMP:-on}
+      - DROP_ICMP_FRAG=${DROP_ICMP_FRAG:-0}
     command: ["/usr/local/bin/role.sh", "router"]
     volumes:
       - ./results:/lab/results

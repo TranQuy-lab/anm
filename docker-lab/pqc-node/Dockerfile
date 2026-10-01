@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential perl wget ca-certificates \
-      iproute2 iputils-ping tcpdump tshark iptables socat \
+      iproute2 iputils-ping tcpdump tshark iptables socat ethtool \
       python3 python3-pip curl jq \
     && rm -rf /var/lib/apt/lists/*
 
