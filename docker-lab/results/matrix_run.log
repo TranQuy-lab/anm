@@ -1,0 +1,154 @@
+ Network labnet-b Creating 
+ Network labnet-b Creating 
+ Network labnet-b Created 
+ Network labnet-b Created 
+ Container lab-pqc-server Creating 
+ Container lab-pqc-server Created 
+ Container lab-pqc-server Starting 
+ Container lab-pqc-server Started 
+[matrix] SERVER_IP=172.30.20.2
+=== [X25519_L0_D0_M1500] loss=0% delay=0msms mtu=1500 group=X25519 ===
+ Network labnet-a Creating 
+ Network labnet-a Creating 
+ Network labnet-a Created 
+ Network labnet-a Created 
+ Container lab-netem-router Creating 
+ Container lab-netem-router Created 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L0_D0_M1280] loss=0% delay=0msms mtu=1280 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L0_D50_M1500] loss=0% delay=50msms mtu=1500 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L0_D50_M1280] loss=0% delay=50msms mtu=1280 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L1_D0_M1500] loss=1% delay=0msms mtu=1500 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L1_D0_M1280] loss=1% delay=0msms mtu=1280 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L1_D50_M1500] loss=1% delay=50msms mtu=1500 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L1_D50_M1280] loss=1% delay=50msms mtu=1280 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L3_D0_M1500] loss=3% delay=0msms mtu=1500 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L3_D0_M1280] loss=3% delay=0msms mtu=1280 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L3_D50_M1500] loss=3% delay=50msms mtu=1500 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L3_D50_M1280] loss=3% delay=50msms mtu=1280 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519_L0_D0_M576] loss=0% delay=0ms mtu=576 group=X25519 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L0_D0_M1500] loss=0% delay=0msms mtu=1500 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L0_D0_M1280] loss=0% delay=0msms mtu=1280 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L0_D50_M1500] loss=0% delay=50msms mtu=1500 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L0_D50_M1280] loss=0% delay=50msms mtu=1280 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L1_D0_M1500] loss=1% delay=0msms mtu=1500 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L1_D0_M1280] loss=1% delay=0msms mtu=1280 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L1_D50_M1500] loss=1% delay=50msms mtu=1500 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L1_D50_M1280] loss=1% delay=50msms mtu=1280 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L3_D0_M1500] loss=3% delay=0msms mtu=1500 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L3_D0_M1280] loss=3% delay=0msms mtu=1280 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L3_D50_M1500] loss=3% delay=50msms mtu=1500 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L3_D50_M1280] loss=3% delay=50msms mtu=1280 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [X25519MLKEM768_L0_D0_M576] loss=0% delay=0ms mtu=576 group=X25519MLKEM768 ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [sites:X25519] ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+=== [sites:X25519MLKEM768] ===
+ Container lab-netem-router Recreate 
+ Container lab-netem-router Recreated 
+ Container lab-netem-router Starting 
+ Container lab-netem-router Started 
+ALL_DONE

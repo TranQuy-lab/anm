@@ -1,0 +1,84 @@
+# Lab nghiên cứu cách ly — PQC/TLS/QUIC measurement + protocol fuzzing
+# Nguyên tắc: mọi mạng lab là internal (không route ra Internet); KHÔNG publish port ra host.
+# Dùng cho đề tài T1 (an toàn cao) và T4 (fuzzing — bắt buộc cách ly này).
+
+services:
+  pqc-server:
+    build: ./pqc-node
+    image: nckh/pqc-node:3.5
+    container_name: lab-pqc-server
+    command: ["/usr/local/bin/role.sh", "server"]
+    volumes:
+      - ./results:/lab/results
+      - ./www:/lab/www:ro
+      - ./pqc-node/role.sh:/usr/local/bin/role.sh:ro
+      - ./pqc-node/hs_loop.sh:/usr/local/bin/hs_loop.sh:ro
+      - ./pqc-node/sites_loop.sh:/usr/local/bin/sites_loop.sh:ro
+    networks: [labnet2]
+    mem_limit: 512m
+    cpus: "1.0"
+    cap_drop: [ALL]
+    restart: "no"
+
+  pqc-client:
+    image: nckh/pqc-node:3.5
+    container_name: lab-pqc-client
+    command: ["/usr/local/bin/role.sh", "client"]
+    volumes:
+      - ./results:/lab/results
+      - ./pqc-node/role.sh:/usr/local/bin/role.sh:ro
+      - ./pqc-node/hs_loop.sh:/usr/local/bin/hs_loop.sh:ro
+      - ./pqc-node/sites_loop.sh:/usr/local/bin/sites_loop.sh:ro
+    networks: [labnet]
+    mem_limit: 512m
+    cpus: "1.0"
+    cap_drop: [ALL]
+    depends_on: [pqc-server]
+    restart: "no"
+
+  # Router có tc/netem: đặt giữa client và server để kiểm soát loss/delay/MTU
+  # SERVER_IP truyền từ host qua biến môi trường LAB_SERVER_IP (DNS môi trường không đáng tin)
+  netem-router:
+    image: nckh/pqc-node:3.5
+    container_name: lab-netem-router
+    environment:
+      - SERVER_IP=${LAB_SERVER_IP:-}
+      - LOSS=${LOSS:-0}
+      - DELAY=${DELAY:-0}
+      - MTU=${MTU:-1500}
+    command: ["/usr/local/bin/role.sh", "router"]
+    volumes:
+      - ./results:/lab/results
+      - ./pqc-node/role.sh:/usr/local/bin/role.sh:ro
+    networks: [labnet, labnet2]
+    mem_limit: 256m
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      - net.ipv4.ip_forward=1
+    restart: "no"
+
+  # Broker MQTT cho hướng fuzzing T4 — KHÔNG có ports:, chỉ trong labnet2
+  mqtt-broker:
+    image: eclipse-mosquitto:2.1
+    container_name: lab-mqtt-broker
+    command: ["mosquitto", "-c", "/mosquitto-no-auth.conf"]
+    networks: [labnet2]
+    mem_limit: 256m
+    cpus: "0.5"
+    restart: "no"
+
+networks:
+  labnet:
+    name: labnet-a
+    internal: true          # không ra Internet
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  labnet2:
+    name: labnet-b
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.20.0/24

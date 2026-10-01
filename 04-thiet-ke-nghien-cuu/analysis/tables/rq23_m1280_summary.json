@@ -1,0 +1,44 @@
+{
+  "n_flows_X25519": 177,
+  "n_flows_MLKEM768": 180,
+  "baseline_cv_acc_mean": 0.9944444444444445,
+  "baseline_cv_acc_sd": 0.011111111111111117,
+  "drift_acc": 1.0,
+  "drift_macroF1": 1.0,
+  "drift_acc_CI95": [
+    1.0,
+    1.0
+  ],
+  "adaptation_curve": [
+    {
+      "k": 1,
+      "mean": 1.0,
+      "lo": 1.0,
+      "hi": 1.0
+    },
+    {
+      "k": 3,
+      "mean": 1.0,
+      "lo": 1.0,
+      "hi": 1.0
+    },
+    {
+      "k": 5,
+      "mean": 1.0,
+      "lo": 1.0,
+      "hi": 1.0
+    },
+    {
+      "k": 10,
+      "mean": 1.0,
+      "lo": 1.0,
+      "hi": 1.0
+    },
+    {
+      "k": 20,
+      "mean": 1.0,
+      "lo": 1.0,
+      "hi": 1.0
+    }
+  ]
+}
