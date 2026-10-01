@@ -32,8 +32,8 @@ Bốn kết quả chính:
 
 3. **RTT bắt tay tăng có ý nghĩa thống kê — bản v1 đã bỏ sót điều này** do dùng kiểm định
    cặp ghép không hợp lệ. Với Mann–Whitney U + hiệu chỉnh Holm trên thiết kế xen kẽ, trung vị
-   RTT của nhóm lai cao hơn ở **11/13** cấu hình (sign test p = 0,011) và **có ý nghĩa sau Holm
-   ở 4/13** cấu hình, mức tăng **0,17–0,40 ms (≈ 15–35%)** trên testbed cục bộ. Một **thí nghiệm
+   RTT của nhóm lai cao hơn ở **11/13** cấu hình (sign test một phía p = 0,011; hai phía 0,023) và **có ý nghĩa sau Holm
+   ở 4/13** cấu hình, mức tăng **0,17–0,44 ms** trên testbed cục bộ (**+14–17%** khi RTT nền ~1,2 ms; **<0,5%** khi RTT nền ~100 ms). Một **thí nghiệm
    đối chứng có đảo thứ tự ngẫu nhiên** (n = 60 cặp/nhóm) xác nhận hiệu ứng này và cho ước lượng
    sạch hơn: **+0,33…0,36 ms, Cliff's δ ≈ 0,85–0,90, p ≈ 10⁻¹⁷**, trong khi hiệu ứng *vị trí*
    trong cặp (chạy thứ nhất vs thứ hai) **không đáng kể** (p = 0,14 và 0,45) — tức kết luận
@@ -53,8 +53,8 @@ Bốn kết quả chính:
 **Về khả năng nhận dạng lưu lượng:** chúng tôi **không** tuyên bố tính mới — quan sát thụ động
 phân biệt cổ điển/hậu lượng tử đã được công bố (arXiv:2503.17830; ePrint 2026/834;
 arXiv:2608.22683). Đóng góp ở đây là **đo ranh giới**: nhóm KEM đạt **accuracy 1,00** chỉ với
-họ đặc trưng *chạm vào bắt tay*, và tụt về **0,58–0,59** (≈ ngẫu nhiên 0,5) với đặc trưng pha
-ứng dụng thuần. Fixture 6 site của chúng tôi **tầm thường** (1-NN một đặc trưng = 1,000) và
+họ đặc trưng *chạm vào bắt tay*, và tụt về **0,58–0,59** — **yếu nhưng vẫn trên mức ngẫu nhiên 0,5** (170/288, p = 0,0026 cho
+đặc trưng tổng; 167/288, p = 0,0079 cho chuỗi gói) — khi chỉ dùng đặc trưng pha ứng dụng thuần. Fixture 6 site của chúng tôi **tầm thường** (1-NN một đặc trưng = 1,000) và
 điều này được báo cáo như một phép kiểm bắt buộc, không giấu.
 
 ---
@@ -193,7 +193,7 @@ họ đặc trưng).
 | ServerHello (handshake length) | 118 B | 1206 B | 10,2× |
 | — trong đó: trường key_share | 32 B | **1120 B** | — |
 | Toàn bộ flight client (CH + Finished/GET) | 297 B | 1473 B | 4,96× |
-| Toàn bộ flight server (SH+EE+Cert+CV+Fin) | 767 B | 1845 B | **2,41×** |
+| Toàn bộ flight server (SH + CCS + EE + Cert + CV + Fin) | 767 B | 1845 B | **2,41×** |
 
 Bóc tách extension trên capture snaplen đầy đủ cho thấy ngân sách byte **khớp FIPS 203 tuyệt đối**:
 
@@ -205,7 +205,9 @@ Chênh lệch *tổng* lại nhỏ hơn hai con số này, và phần hụt đư
 - **ΔClientHello = +1176 B = 1184 − 8**: nhóm lai **bỏ extension `ec_point_formats`**
   (4 B payload + 4 B header) mà ClientHello X25519 có.
 - **Δflight server = +1076…1078 B ≈ 1088 − 10**: nhóm lai bỏ `ec_point_formats` trong
-  EncryptedExtensions (12 B → 2 B), cộng dao động độ dài chữ ký ECDSA (±2 B).
+  EncryptedExtensions. Phần này **đã được kiểm chứng độc lập bằng giải mã**: dùng keylog khớp
+  pcap, EncryptedExtensions đo được **12 B (X25519) → 2 B (PQC)**, chênh đúng 10 B (check C3);
+  phần dao động ±2 B còn lại là độ dài chữ ký ECDSA.
 
 Bản v1 công bố "khớp lý thuyết với sai lệch 0,0%" bằng cách so Δclient với **chính giá trị
 đo được** (1176) và gán sai vai trò của ciphertext/encapsulation key. Bản v2 thay bằng phép
@@ -236,26 +238,26 @@ larger than a single packet"*; Bảng 2 định lượng cụ thể điều đó
 
 **Bảng 3 — RTT bắt tay (ms, trung vị), Mann–Whitney U + Holm trong họ `hs_rtt` (13 cấu hình):**
 
-| loss% | delay | MTU | X25519 | X25519MLKEM768 | Δ | p_holm | Cliff's δ |
-|---|---|---|---|---|---|---|---|
-| 0 | 0 | 1500 | 1,208 | 1,418 | **+0,211** | **0,0061** | −0,52 |
-| 0 | 0 | 1280 | 1,465 | 1,537 | +0,072 | 0,83 | −0,23 |
-| 0 | 0 | 576 | 1,204 | 1,372 | **+0,168** | **0,0054** | −0,53 |
-| 0 | 50 | 1280 | 101,9 | 102,3 | **+0,40** | **0,0081** | −0,50 |
-| 0 | 50 | 1500 | 101,8 | 102,0 | +0,21 | 0,15 | −0,36 |
-| 1 | 0 | 1280 | 1,253 | 1,376 | +0,12 | 0,15 | −0,36 |
-| 1 | 0 | 1500 | 1,604 | 1,468 | −0,14 | 1,00 | −0,07 |
-| 1 | 50 | 1280 | 102,0 | 102,1 | +0,09 | 1,00 | −0,14 |
-| 1 | 50 | 1500 | 102,0 | 101,9 | −0,06 | 1,00 | −0,12 |
-| 3 | 0 | 1280 | 1,270 | 1,389 | +0,12 | 1,00 | −0,18 |
-| 3 | 0 | 1500 | 1,485 | 1,711 | +0,23 | 1,00 | −0,12 |
-| 3 | 50 | 1280 | 102,0 | 102,4 | **+0,40** | **0,00014** | −0,66 |
-| 3 | 50 | 1500 | 101,9 | 102,0 | +0,13 | 0,83 | −0,24 |
+| loss% | delay | MTU | X25519 | X25519MLKEM768 | Δ | tăng tương đối | p_holm | Cliff's δ |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 0 | 1500 | 1,208 | 1,418 | **+0,211** | +17,4% | **0,0061** | −0,52 |
+| 0 | 0 | 1280 | 1,465 | 1,537 | +0,072 | +4,9% | 0,83 | −0,23 |
+| 0 | 0 | 576 | 1,204 | 1,372 | **+0,168** | +14,0% | **0,0054** | −0,53 |
+| 0 | 50 | 1280 | 101,857 | 102,279 | **+0,422** | +0,4% | **0,0081** | −0,50 |
+| 0 | 50 | 1500 | 101,794 | 102,004 | +0,210 | +0,2% | 0,15 | −0,36 |
+| 1 | 0 | 1280 | 1,253 | 1,376 | +0,123 | +9,8% | 0,15 | −0,36 |
+| 1 | 0 | 1500 | 1,604 | 1,468 | −0,135 | −8,4% | 1,00 | −0,07 |
+| 1 | 50 | 1280 | 101,983 | 102,132 | +0,149 | +0,1% | 1,00 | −0,14 |
+| 1 | 50 | 1500 | 102,018 | 101,918 | −0,100 | −0,1% | 1,00 | −0,12 |
+| 3 | 0 | 1280 | 1,270 | 1,389 | +0,119 | +9,4% | 1,00 | −0,18 |
+| 3 | 0 | 1500 | 1,485 | 1,711 | +0,226 | +15,2% | 1,00 | −0,12 |
+| 3 | 50 | 1280 | 101,955 | 102,400 | **+0,444** | +0,4% | **0,00014** | −0,66 |
+| 3 | 50 | 1500 | 101,930 | 102,043 | +0,113 | +0,1% | 0,83 | −0,24 |
 
 *Toàn bộ 13 cấu hình: `analysis/tables/rq1_stats.csv`.*
 
 **Đọc bảng này cho đúng:** hướng hiệu ứng **nhất quán** (nhóm lai cao hơn ở 11/13 cấu hình;
-sign test p = 0,011) nhưng chỉ **4/13** cấu hình vượt được ngưỡng sau hiệu chỉnh Holm — đúng
+sign test một phía p = 0,011; hai phía 0,023) nhưng chỉ **4/13** cấu hình vượt được ngưỡng sau hiệu chỉnh Holm — đúng
 với kỳ vọng công suất ở n = 30 (chỉ phát hiện chắc chắn hiệu ứng |δ| ≳ 0,5; các cấu hình có
 mất gói làm phương sai tăng mạnh nên không đủ công suất). Kết luận đúng là: **mức tăng nhỏ,
 có thật, và không phải là một vòng RTT thêm**.
@@ -267,8 +269,15 @@ Phân rã RTT (mạng sạch) định vị chi phí:
 | 1500 | 0,348 → 0,440 ms (**+0,092**, p_holm = 6,2·10⁻⁴) | 0,867 → 0,962 ms (+0,095, p_holm = 0,25) |
 | 576 | 0,356 → 0,460 ms (**+0,104**, p_holm = 1,8·10⁻⁵) | 0,855 → 0,911 ms (+0,056, p_holm = 0,18) |
 
+Một metric nữa cũng được báo cáo đầy đủ vì nó tách hai nhóm gần như tuyệt đối: **độ trải của
+flight server** (`sv_spread`, khoảng thời gian giữa byte server đầu và byte server cuối trong
+cửa sổ bắt tay) — X25519 gần như bằng 0 (flight đến trong một đợt), nhóm lai 0,001–0,003 ms,
+`p_holm ≈ 1,3·10⁻¹¹`, Cliff's δ = −1,00 ở 12/13 cấu hình. Đây **không phải** một chi phí mới mà
+là **cùng một cơ chế phân mảnh nhìn từ góc khác**: flight 1845 B của nhóm lai bị cắt thành hai
+đoạn nên có độ trải, còn 767 B của X25519 thì không.
+
 Tức là phần lớn chi phí nằm ở **thời gian để byte server đầu tiên tới client** — phù hợp với
-việc server phải mã hóa và truyền một flight lớn hơn (1846 B so với 767 B), chứ không phải
+việc server phải mã hóa và truyền một flight lớn hơn (1845 B so với 767 B), chứ không phải
 một vòng khứ hồi phụ.
 
 **Đối chứng thứ tự (loại trừ nhiễu do thứ tự chạy).** Ma trận chính luôn cho X25519 chạy trước,
@@ -277,8 +286,10 @@ thứ tự ngẫu nhiên, n = 60 cặp/nhóm:
 
 | MTU | X25519 | X25519MLKEM768 | Δ nhóm | p (nhóm) | Cliff's δ | Δ vị trí (2 − 1) | p (vị trí) |
 |---|---|---|---|---|---|---|---|
-| 1280 | 2,730 ms | 3,088 ms | **+0,358 ms** | **1,9·10⁻¹⁷** | 0,90 | +0,212 ms | 0,14 (n.s.) |
-| 1500 | 2,787 ms | 3,118 ms | **+0,331 ms** | **1,8·10⁻¹⁵** | 0,84 | −0,023 ms | 0,45 (n.s.) |
+| 1280 | 2,730 ms | 3,088 ms | **+0,358 ms** | **1,9·10⁻¹⁷** | 0,90 | +0,212 ms¹ | 0,14¹ |
+| 1500 | 2,787 ms | 3,118 ms | **+0,331 ms** | **1,8·10⁻¹⁵** | 0,84 | −0,023 ms | 0,45 |
+
+¹ Δvị trí ở đây là **trung vị lề** và bị **confound thành phần** (ở MTU 1280, vị trí 1 gồm 37 X25519 + 23 PQC còn vị trí 2 gồm 23 X25519 + 37 PQC), nên **không** dùng nó để kết luận; kết luận dựa trên phân rã trong từng nhóm ở dưới.
 
 Phân rã 2×2 xác nhận tính tách bạch: hiệu ứng **nhóm** ổn định trong cả hai vị trí
 (+0,344…+0,387 ms), còn hiệu ứng **vị trí** tính trong từng nhóm chỉ 0,01–0,07 ms. Nhãn vị trí
@@ -297,8 +308,8 @@ chỉ nên so sánh **trong cùng một lần chạy**.
 - **780/780 lần chạy client trả `exit_code = 0`**; **780/780 flow bắt được và phân tích được**
   (khớp tuyệt đối, hoà giải tự động từ CSV — xem `tables/rq1_summary.json` mục `reconciliation`).
 - Retransmission trung bình tăng theo mất gói như kỳ vọng (**0,15 ở 1%**; **0,42 ở 3%**) và
-  **không khác biệt có ý nghĩa** giữa hai nhóm ở bất kỳ cấu hình nào (p_holm = 1,0 ở cả 8 cấu
-  hình mất gói). Với n = 30/nhóm, đây là "không phát hiện được hiệu ứng", không phải "chứng minh
+  **không khác biệt có ý nghĩa** giữa hai nhóm ở bất kỳ cấu hình nào (p_holm > 0,05 ở cả 8 cấu
+  hình mất gói; giá trị thấp nhất 0,84 ở `L1_D0_M1500`, còn lại bằng 1,00). Với n = 30/nhóm, đây là "không phát hiện được hiệu ứng", không phải "chứng minh
   không có hiệu ứng".
 - `flow_dur` (thời lượng cả kết nối) cũng được báo cáo đầy đủ; nó có ý nghĩa ở một số cấu hình
   mạng sạch (`p_holm` = 0,0087 ở MTU 1500; 0,042 ở MTU 576; 8,8·10⁻⁵ ở L0_D50_M1280), phản ánh
@@ -320,7 +331,7 @@ chỉ nên so sánh **trong cùng một lần chạy**.
 | c6 | hybrid | 1500 | off | chặn | 6/6 | 0,50 s | 0 |
 | c7 | X25519 | 1500 | off | chặn | 6/6 | 0,56 s | 0 |
 | c8 | hybrid | **576** | off | chặn | **0/6** | 8,56 s | 0 |
-| c9 | X25519 | **576** | off | chặn | **0/6** | 8,60 s | 0 |
+| c9 | X25519 | **576** | off | chặn | **0/6** | 8,59 s | 0 |
 
 Bốn kết luận:
 
@@ -330,8 +341,12 @@ Bốn kết luận:
 2. **Bỏ bất kỳ nhân tố nào là đủ để khôi phục 6/6**: cho ICMP qua (c2), bật MSS clamp (c5),
    hoặc PMTU 1500 (c6).
 3. **X25519 miễn nhiễm ở PMTU 1280** (c3: 6/6) vì mọi thông điệp của nó vừa một packet.
-4. **Ở PMTU 576, X25519 cũng hỏng** (c9: 0/6). Vậy rủi ro thuộc về **kích thước vượt PMTU**,
-   không phải đặc quyền của PQC. PQC chỉ **dịch ngưỡng an toàn**: X25519 cần PMTU ≳ 820 B
+4. **Ở PMTU 576, X25519 cũng hỏng** (c9: 0/6) — *nhưng cơ chế khác*: ở cột 576, hướng
+   server→client vượt MTU **ngay trên chặng veth/bridge trước router** (capture của c9 có **0 gói
+   ICMP** và 0 gói dữ liệu server→client; server có gửi nhưng bị bỏ im lặng trước điểm capture),
+   nên cột này minh hoạ **drop im lặng theo MTU**, không phải blackhole PMTUD. Các cột c1–c7 và
+   đối chứng thứ tự không bị ảnh hưởng. Điều rút ra vẫn đúng: rủi ro thuộc về **kích thước vượt
+   PMTU**, không phải đặc quyền của PQC. PQC chỉ **dịch ngưỡng an toàn**: X25519 cần PMTU ≳ 820 B
    (giới hạn bởi flight server 767 B), trong khi hybrid cần PMTU ≳ 1450 B (giới hạn bởi
    ClientHello 1393 B cộng header IP/TCP/Ethernet) — tức là đưa nhiều đường truyền thực tế
    (VPN, tunnel, IPv6 tối thiểu 1280) vào vùng nguy hiểm.
@@ -368,7 +383,7 @@ pha ứng dụng gần như không thấy gì (≈ 0,5 = ngẫu nhiên). Đây l
 | Tất cả | 1,000 | 1,000 |
 | Tổng byte / tổng pha ứng dụng | 1,000 | 1,000 |
 | Chuỗi gói pha ứng dụng | 0,493 | 0,500 |
-| Bắt tay thuần | — | 0,160 |
+| Bắt tay thuần | 0,188 (so với 1/6, p = 0,28 — *không* phải drift) | 0,160 (≈ mức ngẫu nhiên 1/6) |
 
 Không có drift: họ chuỗi gói vốn đã yếu (0,49 ngay trong cùng MTU), còn họ tổng byte thì bất
 biến với MTU. **RQ3 (chi phí thích ứng) do đó không kiểm chứng được với fixture này** — mọi
@@ -392,24 +407,43 @@ Toàn bộ hồ sơ ở `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md`. Tóm tắ
    hội tụ với phát hiện của tôi); một agent khác xác minh **16/16 trích dẫn** và tìm ra
    **6 công trình tiền lệ** chiếm mất các tuyên bố "đầu tiên".
 
+Sau khi bản v2 hoàn tất, chúng tôi chạy **thêm một vòng phản biện độc lập trên chính bản v2**
+(nhằm bắt lỗi do việc sửa chữa gây ra). Vòng này tìm ra bốn vấn đề và **tất cả đã được sửa**:
+
+1. **Check D của audit tự quy chiếu** ("sự thật" định nghĩa bằng chính ngưỡng đang kiểm ⇒ không
+   bao giờ FAIL). Đã thay bằng phép kiểm thật: luật ngưỡng 800 B đối chiếu với **nhãn nhóm đọc từ
+   CSV lần chạy** (nguồn độc lập với pcap).
+2. **Bảng §4 chép tay sai** hai ô so với `audit_results.csv` (tỉ lệ placebo 0,070 so với 0,080;
+   mô tả check J). Đã sửa và bảng nay khớp từng ô với file kết quả.
+3. **Hai ô PMTUD ở PMTU 576 (c8/c9) đo sai cơ chế**: ở cột 576, hướng server→client vượt MTU
+   **trước** router nên **không có ICMP nào được phát** (capture: 0 gói ICMP). Đây là *drop im
+   lặng*, không phải blackhole PMTUD. Đã dán nhãn lại và nêu rõ; kết luận c1/c2 không đổi.
+4. **Test "hiệu ứng vị trí" trong đối chứng thứ tự bị confound thành phần** (hai vị trí có tỉ lệ
+   nhóm khác nhau nên trung vị lề không so được). Đã chuyển sang **sai khác trong từng nhóm**
+   (0,01–0,07 ms) và bỏ tiêu chí sai khỏi audit.
+5. Ngoài ra: log keylog của capture đầy đủ trước đây **không khớp pcap** (file mồ côi) nên phần
+   −10 B không giải mã được; đã sửa `run_ch_budget.sh` để truyền `-keylogfile` cùng lần chạy và
+   thêm **check C3** giải mã EncryptedExtensions.
+
 Kết quả audit tự động (`analysis/audit_kiemdinh.py`, output `tables/audit_results.csv`):
-**13/13 hạng mục PASS, 0 FAIL, 0 WARN** (bảng đầy đủ: `tables/audit_results.csv`):
+**14/14 hạng mục PASS, 0 FAIL, 0 WARN** (bảng đầy đủ: `tables/audit_results.csv`):
 
 | # | Lược kiểm | Kết quả |
 |---|---|---|
 | A | Tái xuất độc lập bằng tshark JSON (khác hoàn toàn code chính) | **PASS** — 297/767 (X25519) và 1473/1845 (PQC), khớp bảng công bố |
-| B | Placebo: chia đôi ngẫu nhiên **cùng nhóm**, 200 lần | **PASS** — tỉ lệ dương tính giả 0,070 |
+| B | Placebo: chia đôi ngẫu nhiên **cùng nhóm**, 200 lần | **PASS** — tỉ lệ dương tính giả 0,080 |
 | C | Đối chiếu FIPS 203 với hằng số **độc lập** (ek 1184 / ct 1088) | **PASS** — Δ +1176 = 1184−8; Δ server +1078 = 1088−10 |
 | C2 | Bóc key_share từ capture snaplen đầy đủ | **PASS** — 1216 = 1184+32 và 1120 = 1088+32 B |
-| D | Fingerprint mù (không dùng nhãn), ngưỡng 800 B | **PASS** — 720/720 flow, chỉ hai giá trị quan sát được: 217 và 1393 |
+| C3 | **Giải mã EncryptedExtensions bằng keylog** | **PASS** — EE 12 B (X25519) → 2 B (PQC), chênh **đúng 10 B** |
+| D | Fingerprint **không dùng nhãn**: luật ngưỡng 800 B đối chiếu với nhãn nhóm đọc từ **CSV lần chạy** | **PASS** — accuracy 1,0000 trên 360 flow; packet đầu client chỉ nhận hai giá trị 217 và 1393 |
 | E | Đặc trưng bắt tay thuần cho 6 lớp site, kiểm nhị thức với 1/6 | **PASS** — accuracy 0,188, p = 0,28 ⇒ không có tín hiệu site |
 | F | Hoán vị nhãn nhóm (hủy tín hiệu thật), 300 lần | **PASS** — tỉ lệ p<0,05 là 0,063 ≈ 5% |
 | G | Tính lại Mann–Whitney + Holm, khớp bảng công bố | **PASS** — khớp từng giá trị |
 | H | Hoà giải số flow bắt được với số lần chạy client | **PASS** — 780 chạy (rc=0: 780) = 780 flow |
 | I | Toàn vẹn thiết kế xen kẽ: hai nhóm cân bằng, xen kẽ | **PASS** — 30/30 mỗi cấu hình; lệch SYN trong cặp ~165 ms |
-| J | Phân mảnh cấp wire tăng theo PQC và theo MTU nhỏ | **PASS** — M1500 1→2; M1280 2→4; M576 3→7 segment (tổng) |
+| J | Phân mảnh cấp wire **tính lại từ pcap**; MTU có hiệu lực thật trên leg egress | **PASS** — client 1→1/1→2/1→3 và server 1→2/1→2/2→4 segment ở MTU 1500/1280/576; gói egress lớn nhất = MTU−52 |
 | K | PMTUD blackhole có kiểm soát | **PASS** — c1 0/6, c2–c7 6/6, c8 và c9 0/6 |
-| L | Đối chứng thứ tự ngẫu nhiên: hiệu ứng nhóm tái lập, hiệu ứng vị trí không đáng kể | **PASS** — Δnhóm +0,358/+0,331 ms (p ≈ 10⁻¹⁷); Δvị trí p = 0,14/0,45 |
+| L | Đối chứng thứ tự ngẫu nhiên: hiệu ứng nhóm tái lập; hiệu ứng vị trí **trong từng nhóm** nhỏ | **PASS** — Δnhóm +0,358/+0,331 ms (p ≈ 10⁻¹⁷); Δvị trí trong nhóm chỉ +0,012/−0,045 và +0,061/+0,066 ms |
 
 Ba hạng mục của bản v1 đã được **sửa vì chúng tự tham chiếu hoặc vô hiệu**:
 C (so với chính giá trị đo được), E (so với ngưỡng tuỳ ý 0,30 thay vì mức ngẫu nhiên 1/6),

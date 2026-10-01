@@ -23,8 +23,11 @@ for G in X25519 X25519MLKEM768; do
     -v "$PWD/results:/lab/results" -v "$PWD/pqc-node:/lab/scripts:ro" nckh/pqc-node:3.5 \
     bash /lab/scripts/capture.sh "/lab/results/pcap_full_${G}.pcapng" 0 "tcp port 4433" >/dev/null
   sleep 0.6
+  # -keylogfile đi KÈM mỗi lần chạy để keylog khớp đúng pcap (nếu không, keylog là file mồ côi
+  # và không giải mã được EncryptedExtensions ⇒ không kiểm chứng được phần −10 B).
+  rm -f "results/keys_${G}.log"
   docker compose run --rm -e TARGET="$ROUTER_IP" -e GROUP="$G" pqc-client bash -c \
-    'for i in 1 2 3; do echo "GET /site1.bin HTTP/1.0" | timeout 10 /usr/local/ssl/bin/openssl s_client -connect "$TARGET":4433 -tls1_3 -groups "$GROUP" -brief -quiet >/dev/null 2>&1 || true; sleep 0.2; done'
+    'for i in 1 2 3; do echo "GET /site1.bin HTTP/1.0" | timeout 10 /usr/local/ssl/bin/openssl s_client -connect "$TARGET":4433 -tls1_3 -groups "$GROUP" -keylogfile "/lab/results/keys_'"$G"'.log" -brief -quiet >/dev/null 2>&1 || true; sleep 0.2; done'
   sleep 2
   docker kill -s INT "$CAP" >/dev/null 2>&1 || true
   sleep 0.8

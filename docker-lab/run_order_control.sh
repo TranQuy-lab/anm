@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 chmod 0777 results 2>/dev/null || true
-N="${N_HS:-30}"
+N="${N_HS:-60}"
 net_ip() {
   docker network inspect "$1" --format '{{range .Containers}}{{.Name}}={{.IPv4Address}} {{end}}' \
     | tr ' ' '\n' | sed 's|^/||' | grep "^$2=" | cut -d= -f2 | cut -d/ -f1 | head -1

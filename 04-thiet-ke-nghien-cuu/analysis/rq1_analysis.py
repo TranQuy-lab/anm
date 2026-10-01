@@ -111,13 +111,14 @@ def connection_features(legs):
                 continue
             if M["src0"].startswith("172.30.20.") and abs(M["t0"] - L["t0"]) < 0.02:
                 egr, egr_src = M["g"], M["src0"]; break
-        wire_cl_nseg = wire_cl_bytes = np.nan
+        wire_cl_nseg = wire_cl_bytes = wire_cl_first = np.nan
         if egr is not None:
             # chỉ gói router→server (đúng chiều client→server ở chặng sau NAT)
             e = egr[egr["src"] == egr_src]
             # chỉ tính flight ClientHello (trước khi server gửi byte dữ liệu đầu tiên)
             e = e[(e["tcplen"] > 0) & (e["time"] >= t_ch - 0.05) & (e["time"] < t_sv1)]
             wire_cl_nseg, wire_cl_bytes = int(len(e)), float(e["tcplen"].sum())
+            wire_cl_first = float(e["tcplen"].iloc[0]) if len(e) else np.nan
 
         out.append({
             "ok": 1, "stream": L["stream"], "t_syn": float(g["time"].min()),
@@ -138,7 +139,7 @@ def connection_features(legs):
             # phía client thì gần như luôn bằng 0 vì phần lớn mất gói rơi vào flight server)
             "retrans": int((g["retrans"] == 1).sum()),
             "flow_dur": float(cli["time"].max() - cli["time"].min()),
-            "wire_cl_nseg": wire_cl_nseg, "wire_cl_bytes": wire_cl_bytes,
+            "wire_cl_nseg": wire_cl_nseg, "wire_cl_bytes": wire_cl_bytes, "wire_cl_first": wire_cl_first,
             "wire_sv_nseg": int((ws["tcplen"] > 0).sum()),
             "cl_seg_max": float(ch_flight["tcplen"].max()) if len(ch_flight) else np.nan,
         })

@@ -33,7 +33,7 @@ def check(cid, name, ok, detail):
 def extract(pcap):
     out = subprocess.run(
         ["tshark", "-r", pcap, "-Y", "tcp", "-T", "json",
-         "-e", "tcp.stream", "-e", "ip.src", "-e", "tcp.srcport",
+         "-e", "tcp.stream", "-e", "ip.src", "-e", "ip.dst", "-e", "tcp.srcport",
          "-e", "tcp.len", "-e", "tcp.seq_raw", "-e", "frame.time_epoch"],
         capture_output=True, text=True).stdout
     pkts = []
@@ -43,7 +43,7 @@ def extract(pcap):
             v = l.get(k)
             return v[0] if isinstance(v, list) else v
         try:
-            pkts.append(dict(stream=int(g("tcp.stream")), src=g("ip.src"), sport=g("tcp.srcport"),
+            pkts.append(dict(stream=int(g("tcp.stream")), src=g("ip.src"), dst=g("ip.dst"), sport=g("tcp.srcport"),
                              tlen=int(g("tcp.len") or 0), seq=int(g("tcp.seq_raw") or 0),
                              t=float(g("frame.time_epoch") or 0)))
         except (TypeError, ValueError):
@@ -172,18 +172,68 @@ try:
 except Exception as e:
     check("C2", "Bóc key_share từ capture đầy đủ", None, f"bỏ qua: {e}")
 
-# ---------------------------------------------------------------- CHECK D: fingerprint mù
-flats = [x for v in SITES.values() for x in v]
-if flats:
-    blind = np.array([x["c1"] > 800 for x in flats]).astype(int)
-    truth = np.array([1 if x["c1"] > 800 else 0 for x in flats])  # định nghĩa, không dùng nhãn
-    # kiểm thật: hai cụm giá trị tách rời hoàn toàn?
-    vals = sorted({x["c1"] for x in flats})
-    acc = float((blind == truth).mean())
-    check("D", "Fingerprint mù: ngưỡng 800 B tách hai nhóm không cần nhãn", acc == 1.0,
-          f"accuracy = {acc:.4f} ({len(flats)} flows); các giá trị packet đầu client quan sát được: {vals}")
-else:
-    check("D", "Fingerprint mù", None, "thiếu flows")
+# ---------------------------------------------------------------- CHECK C3: giải mã EncryptedExtensions
+# Phần −10 B của Δflight server được gán cho việc nhóm lai BỎ extension ec_point_formats trong
+# EncryptedExtensions. Kiểm chứng độc lập: dùng keylog khớp pcap để giải mã và so độ dài EE.
+def ee_len(pcap, keylog):
+    """Độ dài EncryptedExtensions. Một frame có thể chứa NHIỀU handshake message nên phải
+    căn theo chỉ số: tìm vị trí type==8 trong danh sách type rồi lấy length cùng chỉ số."""
+    out = subprocess.run(["tshark", "-r", pcap, "-o", f"tls.keylog_file:{keylog}",
+                          "-Y", "tls.handshake.type==8", "-T", "fields",
+                          "-e", "tls.handshake.type", "-e", "tls.handshake.length"],
+                         capture_output=True, text=True).stdout.strip().split("\n")
+    for line in out:
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        types = [t.strip() for t in parts[0].split(",")]
+        lens = [l.strip() for l in parts[1].split(",")]
+        if "8" in types:
+            i = types.index("8")
+            if i < len(lens) and lens[i]:
+                return int(lens[i])
+    return None
+
+try:
+    ee = {}
+    for G in ("X25519", "X25519MLKEM768"):
+        pc = os.path.join(LAB, f"pcap_full_{G}.pcapng")
+        kl = os.path.join(LAB, f"keys_{G}.log")
+        if not (os.path.exists(pc) and os.path.exists(kl)):
+            raise FileNotFoundError(pc if not os.path.exists(pc) else kl)
+        ee[G] = ee_len(pc, kl)
+    okC3 = (ee.get("X25519") is not None and ee.get("X25519MLKEM768") is not None
+            and ee["X25519"] - ee["X25519MLKEM768"] == 10)
+    check("C3", "Giải mã EE bằng keylog: nhóm lai bỏ ec_point_formats ⇒ EE ngắn hơn đúng 10 B",
+          okC3, f"EncryptedExtensions: X25519 {ee.get('X25519')} B → PQC {ee.get('X25519MLKEM768')} B "
+                f"(chênh {None if None in ee.values() else ee['X25519']-ee['X25519MLKEM768']} B)")
+except Exception as e:
+    check("C3", "Giải mã EncryptedExtensions bằng keylog", None, f"bỏ qua: {e}")
+
+# ---------------------------------------------------------------- CHECK D: fingerprint mù (THẬT)
+# Bản v1 của check này tự quy chiếu: "sự thật" được định nghĩa bằng chính ngưỡng đang kiểm
+# (truth = c1 > 800) nên accuracy luôn = 1,0 và không bao giờ FAIL. Bản này kiểm ĐÚNG cách:
+# luật ngưỡng 800 B (rút từ MTU 1500, không dùng nhãn) được đối chiếu với NHÃN NHÓM ĐỘC LẬP
+# đọc từ CSV lần chạy (sites2_M1500.csv) — nhãn này do client tự khai khi chạy, không suy từ pcap.
+d_ok, d_msg = None, "thiếu dữ liệu"
+fl1500 = SITES.get(1500, [])
+csv_sites = os.path.join(LAB, "sites2_M1500.csv")
+if fl1500 and os.path.exists(csv_sites):
+    meta = pd.read_csv(csv_sites); meta["t0_s"] = meta["t_ns_wall"] / 1e9
+    pred, true = [], []
+    for x in fl1500:
+        k = int(np.argmin(np.abs(meta["t0_s"].values - x["t0"])))
+        if abs(meta["t0_s"].values[k] - x["t0"]) > 1.0:
+            continue
+        pred.append(1 if x["c1"] > 800 else 0)
+        true.append(1 if meta["group"].values[k] == "X25519MLKEM768" else 0)
+    if pred:
+        acc = float((np.array(pred) == np.array(true)).mean())
+        vals = sorted({x["c1"] for x in fl1500})
+        d_ok = (acc == 1.0) and (len(vals) == 2)
+        d_msg = (f"accuracy = {acc:.4f} trên {len(pred)} flow (nhãn lấy từ CSV lần chạy, KHÔNG suy từ pcap) | "
+                 f"packet đầu client chỉ nhận hai giá trị: {vals}")
+check("D", "Fingerprint mù: luật ngưỡng 800 B đối chiếu với nhãn nhóm ĐỘC LẬP", d_ok, d_msg)
 
 # ---------------------------------------------------------------- CHECK E: handshake-only vs 1/6
 try:
@@ -253,10 +303,18 @@ for f in sorted(glob.glob(os.path.join(LAB, "hs2_*.csv"))):
     runs.append(pd.read_csv(f))
 attempted = sum(len(d) for d in runs) if runs else 0
 rc0 = sum(int((d.exit_code == 0).sum()) for d in runs) if runs else 0
+rc_bad = attempted - rc0
 captured = len(pubF)
-okH = (attempted == 0) or (captured == attempted)
-check("H", "Hoà giải: số flow bắt được = số lần chạy client (rc=0)", okH,
-      f"client chạy = {attempted} (rc=0: {rc0}, rc≠0: {attempted-rc0}) | flow phân tích được = {captured} | "
+# KHÔNG được PASS khi thiếu dữ liệu (bản v1: attempted == 0 vẫn PASS), và mã thoát khác 0
+# phải làm FAIL — bản v1 tính rc0 nhưng không dùng.
+if attempted == 0:
+    okH = None
+elif rc_bad > 0:
+    okH = False
+else:
+    okH = (captured == attempted)
+check("H", "Hoà giải: số flow bắt được = số lần chạy client, mọi lần đều rc=0", okH,
+      f"client chạy = {attempted} (rc=0: {rc0}, rc≠0: {rc_bad}) | flow phân tích được = {captured} | "
       f"lệch = {attempted-captured}")
 
 # ---------------------------------------------------------------- CHECK I: toàn vẹn thiết kế xen kẽ
@@ -276,27 +334,75 @@ for (l, d, m), flows in HS.items():
         for t in tp:
             gaps.append(float(np.min(np.abs(tx - t))))
 check("I", "Toàn vẹn thiết kế xen kẽ: hai nhóm cân bằng và xen kẽ trong từng cấu hình",
-      counts_ok and (not gaps or np.median(gaps) < 0.3),
+      (counts_ok and (np.median(gaps) < 0.3)) if gaps else None,
       f"số flow X/PQC mỗi cấu hình: {', '.join(msg_cnt[:4])}… | khoảng cách tới flow khác nhóm "
-      f"gần nhất (trung vị) = {np.median(gaps)*1000:.1f} ms" if gaps else "thiếu dữ liệu")
+      f"gần nhất (trung vị) = {np.median(gaps)*1000:.1f} ms" if gaps else "thiếu dữ liệu (không PASS)")
 
 # ---------------------------------------------------------------- CHECK J: phân mảnh cấp wire
-seg = pubF[(pubF.loss == 0) & (pubF.delay == 0)].groupby(["mtu", "group"])[["wire_cl_nseg", "sv_nseg"]].median()
-msg = []
-okJ = True
-for mtu in sorted(pubF.mtu.unique()):
-    try:
-        sx = seg.loc[(mtu, "X25519")]; sp = seg.loc[(mtu, "X25519MLKEM768")]
-    except KeyError:
+# Bản v1 đọc thẳng bảng công bố (tables/rq1_flows.csv) → không độc lập. Bản này tính LẠI từ pcap:
+# trên leg egress (router→server), đếm số segment của flight ClientHello và của flight server,
+# đồng thời kiểm kích thước gói lớn nhất ≤ MTU − 52 (chứng minh MTU có hiệu lực thật).
+def wire_segments(pcap):
+    """Phân mảnh CẤP WIRE, tính lại từ pcap, chỉ dùng các leg EGRESS của router:
+      - flight CLIENT: leg post-NAT (router 172.30.20.x -> server 172.30.20.y)
+      - flight SERVER: leg pre-NAT  (router 172.30.10.2 -> client 172.30.10.3)
+    Hai leg của cùng một kết nối được GHÉP theo mốc SYN (< 20 ms), như trong rq1_analysis.py."""
+    by = {}
+    for p in extract(pcap): by.setdefault(p["stream"], []).append(p)
+    legs = []
+    for st, ps in by.items():
+        ps = sorted(ps, key=lambda q: q["t"])
+        legs.append(dict(g=ps, src0=ps[0]["src"], t0=ps[0]["t"]))
+    res = []
+    for L in legs:
+        if not L["src0"].startswith("172.30.10.3"):
+            continue                                    # chỉ xuất phát từ leg pre-NAT (client)
+        M = next((m for m in legs if m is not L and m["src0"].startswith("172.30.20.")
+                  and abs(m["t0"] - L["t0"]) < 0.02), None)
+        if M is None:
+            continue
+        c2s = sorted([p for p in M["g"] if p["src"] == M["src0"] and p["tlen"] > 0], key=lambda q: q["t"])
+        s2c = sorted([p for p in L["g"] if p["src"] != L["src0"] and p["tlen"] > 0], key=lambda q: q["t"])
+        if not c2s or not s2c:
+            continue
+        t_sv1 = s2c[0]["t"]                              # byte đầu tiên của server
+        ch = [p for p in c2s if p["t"] <= t_sv1]         # flight ClientHello trên đường truyền
+        nxt = [p for p in c2s if p["t"] > t_sv1]
+        t_cl2 = nxt[0]["t"] if nxt else float("inf")
+        sv = [p for p in s2c if t_sv1 <= p["t"] <= t_cl2]  # flight server trên đường truyền
+        total = sum(p["tlen"] for p in ch)
+        res.append(dict(group="X25519" if total < 800 else "PQC",
+                        cl_seg=len(ch), cl_bytes=total, sv_seg=len(sv),
+                        sv_bytes=sum(p["tlen"] for p in sv),
+                        maxpkt=max([p["tlen"] for p in ch + sv] or [0])))
+    return res
+
+J = []
+for f in sorted(glob.glob(os.path.join(LAB, "pcap2_L*.pcapng"))):
+    mm = re.search(r"_M(\d+)\.pcapng$", f)
+    if not mm:
         continue
-    msg.append(f"M{mtu}: client {sx['wire_cl_nseg']:.0f}→{sp['wire_cl_nseg']:.0f} seg, "
-               f"server {sx['sv_nseg']:.0f}→{sp['sv_nseg']:.0f} seg")
-    # tổng segment (client+server) của nhóm lai phải LỚN HƠN; ở MTU 1500 có thể client vẫn 1 segment
-    # nhưng flight server (1846 B > MSS 1460) đã tách thành 2 ⇒ kiểm theo tổng.
-    if (sp["wire_cl_nseg"] + sp["sv_nseg"]) <= (sx["wire_cl_nseg"] + sx["sv_nseg"]):
-        okJ = False
-check("J", "Phân mảnh cấp wire tăng theo PQC và theo MTU nhỏ (đo trên leg egress)", okJ,
-      " | ".join(msg) if msg else "chưa có dữ liệu")
+    mtu = int(mm.group(1))
+    for r in wire_segments(f):
+        r["mtu"] = mtu; J.append(r)
+JD = pd.DataFrame(J)
+msg, okJ = [], None
+if len(JD):
+    okJ = True
+    for mtu, sub in JD.groupby("mtu"):
+        sx = sub[sub.group == "X25519"]; sp = sub[sub.group == "PQC"]
+        if sx.empty or sp.empty:
+            okJ = False; continue
+        msg.append(f"M{mtu}: client {sx.cl_seg.median():.0f}→{sp.cl_seg.median():.0f} seg, "
+                   f"server {sx.sv_seg.median():.0f}→{sp.sv_seg.median():.0f} seg "
+                   f"(tổng {sx.cl_seg.median()+sx.sv_seg.median():.0f}→{sp.cl_seg.median()+sp.sv_seg.median():.0f}), "
+                   f"gói egress lớn nhất {sub.maxpkt.max():.0f} ≤ MTU−52={mtu-52}")
+        if (sp.cl_seg.median() + sp.sv_seg.median()) <= (sx.cl_seg.median() + sx.sv_seg.median()):
+            okJ = False
+        if sub.maxpkt.max() > mtu - 52:
+            okJ = False
+check("J", "Phân mảnh cấp wire tính LẠI từ pcap; MTU thực sự có hiệu lực trên leg egress", okJ,
+      " | ".join(msg) if msg else "không dựng được từ pcap")
 
 # ---------------------------------------------------------------- CHECK K: thí nghiệm PMTUD
 pm = os.path.join(LAB, "pmtud_trials.csv")
@@ -320,15 +426,24 @@ oc = os.path.join(BASE, "tables", "order_control.json")
 if os.path.exists(oc):
     O = json.load(open(oc))
     det, okL = [], True
+    dec = O.get("decomposition_2x2", {})
     for k, v in O.items():
         if not k.startswith("MTU"):
             continue
-        det.append(f"{k}: Δnhóm {v['delta_group_ms']:+.3f} ms (p={v['p_group']:.2g}), "
-                   f"Δvị trí {v['delta_order_ms']:+.3f} ms (p={v['p_order']:.2g})")
-        # hiệu ứng nhóm phải DƯƠNG và có ý nghĩa; hiệu ứng vị trí KHÔNG được có ý nghĩa
-        if not (v["delta_group_ms"] > 0 and v["p_group"] < 0.05 and v["p_order"] > 0.05):
+        dd = dec.get(k, {})
+        det.append(f"{k}: Δnhóm {v['delta_group_ms']:+.3f} ms (p={v['p_group']:.2g}) | "
+                   f"Δvị trí TRONG nhóm: X {dd.get('pos_delta_X25519_ms', float('nan')):+.3f}, "
+                   f"PQC {dd.get('pos_delta_X25519MLKEM768_ms', float('nan')):+.3f} ms")
+        # (a) hiệu ứng nhóm phải DƯƠNG và có ý nghĩa;
+        # (b) hiệu ứng vị trí phải được đánh giá TRONG TỪNG NHÓM (trung vị lề bị confound thành phần,
+        #     vì hai vị trí có tỉ lệ nhóm khác nhau) — và phải nhỏ.
+        if not (v["delta_group_ms"] > 0 and v["p_group"] < 0.05):
             okL = False
-    check("L", "Đối chứng thứ tự ngẫu nhiên: hiệu ứng NHÓM tái lập, hiệu ứng VỊ TRÍ không đáng kể",
+        for key in ("pos_delta_X25519_ms", "pos_delta_X25519MLKEM768_ms"):
+            val = dd.get(key)
+            if val is None or abs(val) > 0.10:
+                okL = False
+    check("L", "Đối chứng thứ tự ngẫu nhiên: hiệu ứng NHÓM tái lập; hiệu ứng VỊ TRÍ (trong từng nhóm) nhỏ",
           okL, " | ".join(det))
 else:
     check("L", "Đối chứng thứ tự ngẫu nhiên", None, "chưa chạy run_order_control.sh")

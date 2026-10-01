@@ -9,7 +9,7 @@
 
 | Tầng | Cách làm | Kết quả |
 |---|---|---|
-| **1. Tái lập** | Khôi phục 30 pcap thô từ commit `7717a72`, chạy lại `extract_metrics.sh` và cả 4 script phân tích | TSV tái tạo **trùng khớp tuyệt đối** (93.663 dòng); 4/4 bảng kết quả sinh lại **giống hệt từng byte** ⇒ pipeline xác định, không có số liệu nhập tay |
+| **1. Tái lập** | Khôi phục 30 pcap thô từ commit `7717a72`, chạy lại `extract_metrics.sh` và cả 4 script phân tích | TSV tái tạo **trùng khớp tuyệt đối** (93.663 dòng của **bộ 30 pcap v1**; con số này KHÔNG áp cho `packets_all_gso.tsv` trong repo — file đó gồm thêm các capture `pcap_dec_*`/`pcap_full_*` nên có 93.924 dòng); 4/4 bảng kết quả sinh lại **giống hệt từng byte** ⇒ pipeline xác định, không có số liệu nhập tay |
 | **2. Đo độc lập** | Viết pipeline mới (tshark JSON + phân cụm theo khoảng thời gian + ghép leg theo mốc SYN), không dùng lại code cũ; tự tính lại thống kê | Tái tạo đúng các con số byte (217/1393, 297/1473, 768/1846); **phát hiện 2 lỗi phương pháp** (mục 1.1, 1.2) |
 | **3. Phản biện độc lập** | Giao cho một agent khác (không thấy kết luận của tôi) đọc repo và phản biện như reviewer; một agent khác xác minh **toàn bộ 16 trích dẫn** và tìm tiền lệ | 9 vấn đề CRITICAL/MAJOR; 16/16 trích dẫn có thật nhưng 7 mục sai chi tiết; **6 công trình tiền lệ chiếm mất tuyên bố "đầu tiên"** của báo cáo |
 
@@ -135,7 +135,7 @@ trống này**, không tuyên bố "đầu tiên" ở chỗ đã có người l�
 
 ---
 
-## 5. Vòng tự kiểm chứng bổ sung sau khi sửa: nghi vấn "thứ tự chạy"
+## 4. Vòng tự kiểm chứng bổ sung sau khi sửa: nghi vấn "thứ tự chạy"
 
 Sau khi đã sửa và chạy lại toàn bộ, chúng tôi tự đặt thêm một câu hỏi đối kháng mà **chưa**
 vòng phản biện nào nêu: *"Trong mỗi cặp, X25519 luôn chạy trước. Nếu bản thân việc chạy thứ hai
@@ -153,10 +153,16 @@ vòng phản biện nào nêu: *"Trong mỗi cặp, X25519 luôn chạy trước
   (p = 0,14) và −0,023 ms (p = 0,45) — **không đáng kể**. Phân rã 2×2 cho thấy hiệu ứng nhóm ổn
   định ở cả hai vị trí (+0,344…+0,387 ms), còn hiệu ứng vị trí trong từng nhóm chỉ 0,01–0,07 ms.
 - **Kết luận.** Nghi vấn được **loại trừ**; kết luận RTT đứng vững và thực ra **mạnh hơn** ước
-  lượng ban đầu. Ghi chú phương pháp: hiệu ứng vị trí ở lần chạy nhỏ là **nhiễu do cỡ mẫu**,
-  và bài học là phải tăng mẫu trước khi kết luận về một confound — chứ không phải bỏ qua nó.
+  lượng ban đầu.
+- **Đính chính quan trọng (vòng phản biện thứ hai chỉ ra).** "Hiệu ứng vị trí" tính trên **trung
+  vị lề** (+0,212 ms, p = 0,14) là **confound thành phần**, không phải hiệu ứng thật: ở MTU 1280,
+  vị trí 1 gồm 37 X25519 + 23 PQC còn vị trí 2 gồm 23 X25519 + 37 PQC, nên so hai trung vị lề là
+  so hai hỗn hợp khác thành phần. Tính **trong từng nhóm**, sai khác vị trí chỉ còn **+0,012 ms
+  (X25519)** và **−0,045 ms (PQC)**. Vì vậy: (a) kết luận phải dựa trên phân rã trong nhóm, không
+  dựa trên p lề; (b) tiêu chí `p_order > 0.05` đã bị **bỏ khỏi audit**; (c) cách giải thích "tăng
+  n làm mất ý nghĩa" là **sai** — nguyên nhân là confound thành phần.
 
-## 6. Những gì KHÔNG sửa được / còn nghi vấn
+## 5. Những gì KHÔNG sửa được / còn nghi vấn
 
 1. **Snaplen 160 của dataset v1** làm mọi kiểm tra mức payload bất khả thi. Bản 2 vẫn giữ
    `-s 160` cho ma trận (đủ cho `tcp.len`/phân mảnh) nhưng dùng capture **snaplen đầy đủ**
@@ -174,6 +180,24 @@ vòng phản biện nào nêu: *"Trong mỗi cặp, X25519 luôn chạy trước
    nhân ICMP không tạo khác biệt thì báo cáo phải nói thẳng như vậy (xem `pmtud_trials.csv`).
 
 ---
+
+## 6. Vòng phản biện thứ hai — trên chính bản v2
+
+Sau khi v2 hoàn tất, một agent khác phản biện **bản v2** (không phải v1) để bắt lỗi do việc sửa
+chữa gây ra. Kết quả và cách xử lý:
+
+| Phát hiện trên v2 | Mức | Đã sửa |
+|---|---|---|
+| Check D của audit **tự quy chiếu** ("sự thật" định nghĩa bằng chính ngưỡng đang kiểm ⇒ accuracy luôn 1,0, không bao giờ FAIL) | CRITICAL | Thay bằng phép kiểm thật: luật ngưỡng 800 B đối chiếu **nhãn nhóm đọc từ CSV lần chạy** |
+| Bảng §4 của báo cáo **chép tay sai** so với `audit_results.csv` (placebo 0,070 vs 0,080; mô tả check J) | CRITICAL | Sửa cho khớp từng ô; bảng phải sinh từ file kết quả, không chép tay |
+| Hai ô PMTUD ở PMTU 576 **đo sai cơ chế** (hướng server→client vượt MTU trước router ⇒ 0 gói ICMP ⇒ drop im lặng, không phải PMTUD blackhole) | CRITICAL | Dán nhãn lại; kết luận c1/c2 không đổi |
+| Test "hiệu ứng vị trí" bị **confound thành phần** | MAJOR | Chuyển sang sai khác **trong từng nhóm**; bỏ tiêu chí sai khỏi audit |
+| `rq2b` tuyên bố "packet đầu bất biến theo MTU" — thực ra là **artifact GSO ở leg ingress** | MAJOR | Thêm `wire_cl_first` (leg egress); bất biến chỉ giữ cho **tổng byte flight** |
+| Audit cho **PASS rỗng** khi thiếu dữ liệu (H, I); J đọc lại bảng công bố thay vì pcap | MAJOR | H/I trả WARN khi thiếu dữ liệu, FAIL khi có `rc≠0`; J tính lại từ pcap trên leg egress |
+| Keylog của capture đầy đủ **không khớp pcap** ⇒ phần −10 B không giải mã được | MINOR (đã nâng) | `run_ch_budget.sh` truyền `-keylogfile` cùng lần chạy; thêm **check C3** giải mã EE (12 → 2 B) |
+| Chi tiết nhỏ: thiếu ChangeCipherSpec trong mô tả flight; làm tròn 8,60 vs 8,59; `sv_spread` bị bỏ sót; sign test một phía; "≈ ngẫu nhiên" cho 0,58–0,59; `docker-lab/README.md` còn văn phong v1 | MINOR | Đã sửa toàn bộ; `sv_spread` nay được báo cáo như một góc nhìn của cùng cơ chế phân mảnh |
+
+Sau tất cả các sửa, audit tự động đạt **14/14 PASS** (thêm check C3).
 
 ## 7. Bảng đối chiếu v1 → v2
 
