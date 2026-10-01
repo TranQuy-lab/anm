@@ -89,7 +89,8 @@ bash run_matrix2.sh                  # 13 cấu hình × 30 cặp XEN KẼ + 2 d
 bash run_pmtud.sh                    # thí nghiệm PMTUD có kiểm soát (~10 phút)
 bash run_ch_budget.sh                # capture snaplen đầy đủ cho ngân sách byte (~1 phút)
 N_HS=60 bash run_order_control.sh    # đối chứng ĐẢO THỨ TỰ ngẫu nhiên, n=60 cặp/nhóm (~6 phút)
-bash run_pmtud_threshold.sh          # QUÉT NGƯỠNG PMTU hai chiều, 3 lần thử/ô (~6 phút)
+bash run_pmtud_threshold.sh          # quét ngưỡng PMTU, panel (a) nút thắt giữa (~6 phút)
+bash run_pmtud_threshold_sym.sh      # quét ngưỡng PMTU, panel (b) đối xứng (~8 phút)
 
 cd ../04-thiet-ke-nghien-cuu/analysis
 bash extract_metrics.sh              # pcap2_* → packets_all.tsv
@@ -99,7 +100,7 @@ python rq2b_group_classifier.py      # quan sát tối thiểu để nhận di�
 python order_control.py              # tách bạch hiệu ứng NHÓM vs hiệu ứng VỊ TRÍ
 python audit_kiemdinh.py             # 15 hạng mục kiểm định chéo độc lập
 python pmtud_threshold.py            # ngưỡng PMTU đo được, tách bạch hai chiều
-python check_report_numbers.py       # đối chiếu 199 mục trong báo cáo với dữ liệu thô
+python check_report_numbers.py       # đối chiếu 279 mục trong báo cáo với dữ liệu thô
 python md2pdf_report.py              # (tuỳ chọn) sinh lại PDF
 ```
 
@@ -160,6 +161,10 @@ xác minh 16/16 trích dẫn và tìm tiền lệ).
 - Ma trận dùng snaplen 160 (đủ cho `tcp.len`/phân mảnh); kiểm tra mức payload cần capture riêng.
 - PMTUD mới đo với một kiểu NAT 1-1, PMTU 1280/1500/576; chưa đo nhiều lớp NAT, IPv6, middlebox thật.
 - 6 site tổng hợp, không phải lưu lượng thật; không đo throughput lớn.
+- **Offload chỉ tắt ở router** (NIC của client/server vẫn bật GSO/TSO) và cả hai panel ngưỡng đều
+  cố định endpoint ở MTU 1500 — xem Hạn chế #1 và #7 trong báo cáo.
+- **Sự cố đã ghi nhận:** sweep đối xứng ghi đè pcap cùng tên của sweep bất đối xứng ở MTU 1200/1400;
+  với hai MTU đó chỉ còn tỉ lệ hoàn tất từ CSV.
 
 ## 8. Hướng phát triển
 

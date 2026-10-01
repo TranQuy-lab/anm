@@ -488,6 +488,21 @@ m1 = pmtud_mechanism("c1_hyb_1280_drop")
 m8 = pmtud_mechanism("c8_hyb_576_drop")
 m9 = pmtud_mechanism("c9_x25519_576_drop")
 
+def srv_seq_advance(cid):
+    """Server có THỰC SỰ phát flight không: với TỪNG kết nối (tcp.stream), lấy hiệu số
+    seq_raw lớn nhất − nhỏ nhất của các gói từ phía server (172.30.10.2), rồi lấy TRUNG VỊ.
+    X25519 flight 767 B ⇒ tiến ~768 (767 dữ liệu + 1 cho SYN)."""
+    f = os.path.join(LAB, f"pcap_pmtud_{cid}.pcapng")
+    if not os.path.exists(f):
+        return None
+    per = {}
+    for r in ts_fields(f, "ip.src==172.30.10.2", ["tcp.stream", "tcp.seq_raw"]):
+        if len(r) >= 2 and str(r[1]).strip().isdigit():
+            per.setdefault(r[0], []).append(int(r[1]))
+    adv = [max(v) - min(v) for v in per.values() if len(v) >= 2]
+    return int(np.median(adv)) if adv else None
+
+
 def srv_to_client(cid):
     """Dữ liệu server→client có tới được client không (leg egress pre-NAT)."""
     f = os.path.join(LAB, f"pcap_pmtud_{cid}.pcapng")
@@ -507,13 +522,16 @@ if m1 and m2 and m8 and m9:
             # c9: CH (217 B) PHẢI đã qua được tới server, nhưng KHÔNG có dữ liệu server→client nào
             # tới client ⇒ kết luận 'drop im lặng chiều về' mới có nội dung (nếu server không gửi gì
             # thì tiêu chí cũ vẫn PASS một cách rỗng).
-            and m9["icmp"] == 0 and (217 in m9["egr"]) and (srv_to_client("c9_x25519_576_drop") == 0))
+            and m9["icmp"] == 0 and (217 in m9["egr"])
+            and (srv_seq_advance("c9_x25519_576_drop") or 0) >= 700      # server ĐÃ phát flight 767 B
+            and (srv_to_client("c9_x25519_576_drop") == 0))              # nhưng 0 byte tới client
     check("K2", "Cơ chế trong pcap: ICMP ⇒ tự chia lại CH; chặn ICMP ⇒ blackhole (c1, c8); c9 = drop im lặng chiều server→client",
           okK2,
           f"c2 (cho qua): {m2['icmp']} ICMP, egress nhận {m2['egr']} (≤ MSS 1228), ingress gửi {m2['big']} | "
           f"c1 (chặn): {m1['icmp']} ICMP, gửi lại {m1['retr']} lần nguyên {m1['big']}, egress rỗng | "
           f"c8 (hybrid@576): {m8['icmp']} ICMP, gửi lại {m8['retr']} lần nguyên {m8['big']}, egress rỗng | "
-          f"c9 (X25519@576): {m9['icmp']} ICMP, gói server→client tới được client = {srv_to_client('c9_x25519_576_drop')}")
+          f"c9 (X25519@576): {m9['icmp']} ICMP, seq server tiến {srv_seq_advance('c9_x25519_576_drop')} B "
+          f"(đã phát flight), nhưng gói dữ liệu server→client tới client = {srv_to_client('c9_x25519_576_drop')}")
 else:
     check("K2", "Cơ chế PMTUD trong pcap", None, "thiếu pcap c1/c2/c8/c9")
 

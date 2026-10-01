@@ -138,6 +138,7 @@ def main():
         panels = [("*(a)", sec[:sec.index("*(b)")], "pmtud_threshold.csv", "nút thắt giữa"),
                   ("*(b)", sec[sec.index("*(b)"):], "pmtud_threshold_sym.csv", "đối xứng")]
         for tag, txt, csvname, label in panels:
+            sweep_name = "asym" if "pmtud_threshold.csv" in csvname else "sym"
             D5 = pd.read_csv(os.path.join(LAB, csvname))
             g5 = D5.groupby(["mtu_b", "group"]).established.agg(n="size", ok="mean")
             t5 = [l for l in txt.splitlines()
@@ -159,6 +160,17 @@ def main():
                     chk(int(m.group(1)) == int(round(exp.ok * exp.n)),
                         f"Bảng 5{tag} MTU {mtu} {grp}: báo cáo {m.group(1)}/{m.group(2)} ≠ dữ liệu "
                         f"{int(round(exp.ok*exp.n))}/{int(exp.n)}")
+                # cột quyết định: ClientHello có qua? (chỉ kiểm được khi ô có pcap hướng)
+                key = f"{sweep_name}|M{mtu}|X25519MLKEM768"
+                d = THR.get(key, {})
+                cell = c[3]
+                if d.get("ch_crossed") is not None and ("✓" in cell or "✗" in cell):
+                    rep_ok = "✓" in cell
+                    chk(rep_ok == bool(d["ch_crossed"]),
+                        f"Bảng 5{tag} MTU {mtu}: cột 'CH hybrid qua' ghi {cell.strip()[:20]!r} "
+                        f"nhưng pcap nói ch_{'crossed' if d['ch_crossed'] else 'not_crossed'}")
+                elif d.get("ch_crossed") is None and ("✓" in cell or "✗" in cell):
+                    chk(False, f"Bảng 5{tag} MTU {mtu}: ô có ✓/✗ nhưng không có pcap hướng để kiểm")
         # hai ngưỡng phải được nêu đúng
         for tok in ("1445", "1500", "820"):
             chk(tok in s, f"Bảng 5: thiếu số ngưỡng {tok}")
@@ -252,20 +264,28 @@ def main():
             chk(m is not None and same(num(m.group(1)), (r.med_b - r.med_a) * 1000, 3),
                 f"Phân rã RTT M{mtu} {metric}: Δ báo cáo {c[col]} ≠ dữ liệu {(r.med_b-r.med_a)*1000:.3f} ms")
 
-    # ---------- Bảng drift §3.6 ← rq23_summary ----------
+    # ---------- Bảng drift §3.6 ← rq23_summary (dùng TIỀN TỐ, không khớp cả chuỗi) ----------
     drift = C23.get("rq2_mtu_drift", {})
-    for l in rows_of(s, r"^\| (Tất cả|Tổng byte / tổng pha ứng dụng|Chuỗi gói pha ứng dụng|Bắt tay thuần) \|"):
-        c = [x.strip().replace("*", "").replace("(", " ").split()[0].rstrip(",") for x in l.strip("|").split("|")]
-        key = {"Tất cả": ("within1280_all", "train1500_test1280_all"),
-               "Tổng byte / tổng pha ứng dụng": ("within1280_app_totals", "train1500_test1280_app_totals"),
-               "Chuỗi gói pha ứng dụng": ("within1280_app_seq", "train1500_test1280_app_seq"),
-               "Bắt tay thuần": ("within1280_handshake", "train1500_test1280_handshake")}.get(c[0])
-        if not key:
+    DK = [("Tất cả", "within1280_all", "train1500_test1280_all"),
+          ("Tổng byte", "within1280_app_totals", "train1500_test1280_app_totals"),
+          ("Chuỗi gói", "within1280_app_seq", "train1500_test1280_app_seq"),
+          ("Bắt tay", "within1280_handshake", "train1500_test1280_handshake")]
+    seen_drift = 0
+    for l in rows_of(s, r"^\| (Tất cả|Tổng byte|Chuỗi gói|Bắt tay)"):
+        c = [x.strip().replace("*", "") for x in l.strip("|").split("|")]
+        if len(c) < 3:            # bảng họ đặc trưng (§3.6) chỉ có 2 cột — bỏ qua
             continue
-        for col, k in ((1, key[0]), (2, key[1])):
-            if k not in drift:
-                errs.append(f"Bảng drift: thiếu khóa {k} trong rq23_summary.json"); n += 1; continue
-            chk(same(num(c[col]), drift[k]["acc"], 3), f"Bảng drift '{c[0]}' cột {col}: báo cáo {c[col]} ≠ {drift[k]['acc']:.4f}")
+        for pref, k1, k2 in DK:
+            if not c[0].startswith(pref):
+                continue
+            seen_drift += 1
+            for col, k in ((1, k1), (2, k2)):
+                if k not in drift:
+                    errs.append(f"Bảng drift: thiếu khóa {k}"); n += 1; continue
+                v = re.match(r"[\d,]+", c[col])
+                chk(v is not None and same(num(v.group(0)), drift[k]["acc"], 3),
+                    f"Bảng drift '{c[0]}' cột {col}: báo cáo {c[col]} ≠ {drift[k]['acc']:.4f}")
+    chk(seen_drift == 4, f"Bảng drift: chỉ khớp {seen_drift}/4 dòng")
 
     # ---------- kiểm số NGUYÊN cho vài dòng audit có dữ liệu số thuần ----------
     int_pool = {}
@@ -275,8 +295,17 @@ def main():
             r0 = row0.iloc[0]
             int_pool[cid] = set(re.findall(r"\d+", str(r0["Tên"]) + " " + str(r0["Chi tiết"])))
 
+    # dòng I: "30/30 mỗi cấu hình" phải đúng theo rq1_flows, và các số ms phải có trong audit CSV
+    per = R.groupby(["loss", "delay", "mtu", "group"]).size()
+    chk(int(per.min()) == 30 and int(per.max()) == 30 and "30/30" in s,
+        f"Bảng audit I: dữ liệu có {int(per.min())}–{int(per.max())} flow/cấu hình, báo cáo nói 30/30")
+    rowI = [l for l in rows_of(s, r"^\| I \|")]
+    if rowI:
+        cell = rowI[0].strip("|").split("|")[2]
+        for tok in re.findall(r"(\d+) ms", cell):
+            chk(tok in int_pool.get("I", set()), f"Bảng audit I: '{tok} ms' không có trong audit_results.csv")
     for cid in ("C3", "K2"):
-        row = [l for l in rows_of(s, r"^\| " + cid + r" \|")]
+        row = rows_of(s, r"^\| " + cid + r" \|")
         if not row:
             continue
         cell = row[0].strip("|").split("|")[2]
@@ -303,7 +332,11 @@ def main():
     chk(same(0.15, rl[rl.loss == 1].retrans.mean(), 2), "Văn xuôi: retrans 1% không khớp dữ liệu")
     chk(same(0.42, rl[rl.loss == 3].retrans.mean(), 2), "Văn xuôi: retrans 3% không khớp dữ liệu")
 
-    print(f"Đã đối chiếu {n} mục giữa báo cáo và dữ liệu thô.")
+    n_final = n + 1
+    readme = open(os.path.join(BASE, "..", "..", "README.md"), encoding="utf-8").read()
+    chk(f"{n_final} mục" in s or f"{n_final} mục" in readme,
+        f"Số mục tự mô tả: script kiểm {n_final} mục nhưng báo cáo/README không nêu '{n_final} mục'")
+    print(f"Đã đối chiếu {n_final} mục giữa báo cáo và dữ liệu thô.")
     if errs:
         print("SAI LỆCH:")
         for e in errs:

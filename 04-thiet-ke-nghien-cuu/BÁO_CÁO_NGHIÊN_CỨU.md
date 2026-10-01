@@ -53,7 +53,7 @@ Bốn kết quả chính:
    phải đặc quyền của PQC. Cuối cùng, **ngưỡng PMTU an toàn được đo trực tiếp**: ClientHello
    hybrid cần ≥ 1445 B, nhưng trên đường có nút thắt giữa nhỏ hơn MTU của endpoint, bắt tay
    hybrid chỉ thành công từ **1500 B** (vì flight server bị chia theo MSS 1460 thành gói 1500 B),
-   trong khi X25519 sống từ ~820 B.
+   trong khi X25519 sống từ ≈ 821 B (820 B là biên).
 
 **Về khả năng nhận dạng lưu lượng:** chúng tôi **không** tuyên bố tính mới — quan sát thụ động
 phân biệt cổ điển/hậu lượng tử đã được công bố (arXiv:2503.17830; ePrint 2026/834;
@@ -93,11 +93,20 @@ NIST IR 8547 vẫn là **bản nháp** (Initial Public Draft, 11/2024) — khôn
 
 ### 1.3 Khoảng trống thật sự và câu hỏi nghiên cứu
 
-Cần nói rõ: **hiện tượng PMTUD blackhole do lọc ICMP đã được nghiên cứu kỹ trong mạng nói
-chung từ lâu** (RFC 2923 *TCP Problems with Path MTU Discovery*; RFC 8899 PLPMTUD; Luckie &
-Stasiewicz, *Measuring Path MTU Discovery Behaviour*, IMC 2012). Cái **chưa** được đo là hệ quả
-của nó **đối với bắt tay hậu lượng tử** — tức khi kích thước thông điệp vượt PMTU trở thành
-chuyện thường ngày thay vì ngoại lệ. Sau khi loại các tuyên bố đã bị chiếm, khoảng trống còn lại
+Cần nói rõ ba tầng tiền lệ để không tuyên bố quá mức:
+
+1. **PMTUD blackhole do lọc ICMP** đã được nghiên cứu kỹ trong mạng nói chung từ lâu (RFC 2923
+   *TCP Problems with Path MTU Discovery*; RFC 8899 PLPMTUD; Luckie & Stasiewicz, IMC 2012).
+2. **Lỗi triển khai do kích thước ClientHello** cũng đã biết từ lâu — RFC 7685 (2015) định nghĩa
+   extension **padding** để *tăng* ClientHello nhằm né một lỗi như vậy.
+3. **Chính hiện tượng này với PQC đã được báo cáo ngoài thực tế**: Go issue **#80573** (26/7/2026)
+   ghi ClientHello ~1,5 KB (ML-KEM/ML-DSA) gây treo bắt tay qua middlebox vì gói vượt MTU/buffer
+   1200–1400 B bị bỏ im lặng; luồng **IETF TLS WG (2/2026)** nêu ClientHello 1396–1815 B trải trên
+   nhiều TCP segment "trigger middlebox issues".
+
+Cái **chưa có** — và là chỗ T1 đóng góp — là một **đo lường có kiểm soát tách bạch từng nhân tố**
+(PMTU, lọc ICMP, MSS clamp) để biến các quan sát hiện trường thành **ngưỡng định lượng**, đồng
+thời chỉ rõ nút thắt nằm ở **chiều nào**. Sau khi loại các tuyên bố đã bị chiếm, khoảng trống còn lại
 — và chúng tôi tìm nhiều truy vấn khác nhau mà **không** thấy công trình nào làm — là:
 
 - **G1.** Khi bắt tay PQC vượt PMTU và **ICMP "fragmentation needed" bị lọc**, chuyện gì xảy
@@ -170,7 +179,7 @@ Nhân tố: {X25519, X25519MLKEM768} × PMTU {1500, 1280, 576} × ICMP frag-need
 × MSS clamp {off, on-on-đối-chứng}. 6 lần/ô; client timeout 8 s; server được restart giữa các
 lần để loại nhiễu `s_server` đơn luồng. Hai chi tiết kỹ thuật quyết định tính đúng đắn:
 
-- **Router phải là điểm nghẽn thật**: `MTU_A=1500` (phía client) và `MTU_B` nhỏ (phía server).
+- **Router phải là điểm nghẽn thật**: `MTU_A=1500` (phía client) và `MTU_B` nhỏ (phía server). **Ngoại lệ có chủ ý:** sweep ngưỡng ở mục 3.5 dùng thêm chế độ **đối xứng** (`MTU_A = MTU_B`); ở đó drop xảy ra trên chặng veth/bridge — tương đương một nút thắt giữa đường lọc ICMP — và chính chế độ này đo được **chiều về**.
   Nếu đặt nhỏ cả hai phía, gói lớn bị chặn ở bridge/veth phía host **trước khi tới router**,
   ICMP không bao giờ được phát và phép can thiệp trở nên vô nghĩa. (Đây đúng là điều đã xảy
   ra ở lần chạy đầu; kết quả lần đó bị loại.)
@@ -352,7 +361,7 @@ chỉ nên so sánh **trong cùng một lần chạy**.
 | c9 | X25519 | **576** | off | chặn | **0/6** | 8,59 s | 0 |
 
 **Bảng 5 — Ngưỡng PMTU an toàn, ĐO trực tiếp** (`run_pmtud_threshold{,_sym}.sh`, CLAMP=off,
-ICMP frag-needed bị chặn, 3 lần thử mỗi ô, mỗi ô có pcap riêng):
+ICMP frag-needed bị chặn, 3 lần thử mỗi ô; pcap có cho mọi ô ở panel (b) và 3/5 ô ở panel (a) — xem Hạn chế #7):
 
 *(a) Đường có **nút thắt ở giữa** (MTU_A = 1500, MTU_B = MTU) — đúng kịch bản của mục này:*
 
@@ -364,11 +373,11 @@ ICMP frag-needed bị chặn, 3 lần thử mỗi ô, mỗi ô có pcap riêng):
 | 1440 | 3/3 | 0/3 | ✗ |
 | **1448** | 3/3 | **3/3** | ✓ (một segment 1393 B) |
 
-*(b) Đường **đối xứng** (MTU_A = MTU_B = MTU) — MTU của endpoint bằng MTU đường truyền:*
+*(b) Đường **đối xứng** (MTU_A = MTU_B = MTU): MTU đặt trên **cả hai interface của router**, NIC của endpoint vẫn 1500 — nên endpoint không tự biết PMTU nhỏ và vẫn phát segment theo MSS 1460:*
 
 | MTU | X25519 | hybrid | ClientHello hybrid có qua? |
 |---|---|---|---|
-| 820 | 2/3 | 0/3 | ✗ |
+| 820 | 2/3 (biên: lần hỏng có flight 769 B ⇒ cần ≥ 821 B) | 0/3 | ✗ |
 | 1200 | 3/3 | 0/3 | ✗ |
 | 1400 | 3/3 | 0/3 | ✗ |
 | 1445 | 3/3 | **0/3** | **✓** (1393 B) |
@@ -383,7 +392,7 @@ PMTU ≥ **1445 B** (hỏng ở 1440, qua ở 1448). Nhưng ở 1445 và 1460 �
 vượt PMTU. Chỉ từ **1500 B** cả hai chiều mới vừa. Vậy:
 
 > Trên đường có nút thắt giữa nhỏ hơn MTU của endpoint, **bắt tay hybrid cần PMTU ≥ 1500 B**,
-> còn **X25519 cần ≳ 820–1200 B** (2/3 ở 820 B, 3/3 từ 1200 B). Tức PQC dịch ngưỡng an toàn từ
+> còn **X25519 cần ≥ 821 B** (ở 820 B chỉ 2/3 vì lần hỏng có flight 769 B ⇒ 769 + 52 = 821 > 820; 3/3 từ 1200 B). Tức PQC dịch ngưỡng an toàn từ
 > **~820 B lên ~1500 B** — bao trùm cả MTU tối thiểu của IPv6 (1280 B) và phần lớn đường VPN/tunnel.
 
 *(Ghi chú vận hành: sweep đối xứng chạy sau đã ghi đè pcap cùng tên của sweep bất đối xứng ở các
@@ -413,14 +422,17 @@ Bốn kết luận:
    - **c8 (hybrid, 576)** là **blackhole PMTUD thật**, cùng dấu hiệu như c1: ClientHello 1393 B
      được gửi đi, **không** xuất hiện ở leg egress (không tới server), client gửi lại nguyên cỡ
      6 lần/lần thử, **0 gói ICMP**.
-   - **c9 (X25519, 576)** hỏng vì hướng server→client vượt MTU **trước điểm capture**
-     (0 gói ICMP, 0 dữ liệu server→client; server có gửi 767 B nhưng bị bỏ im lặng trên chặng
-     veth/bridge) ⇒ **drop im lặng theo MTU**, không phải PMTUD.
+   - **c9 (X25519, 576)** hỏng vì hướng server→client vượt MTU **trước điểm capture**. Bằng chứng
+     trực tiếp trong pcap: ClientHello 217 B **đã tới server**; không gian `seq` mà server tiêu
+     thụ (trung vị theo từng kết nối) là **769 B**, tức server **đã phát** flight 767 B của nó;
+     nhưng **không byte dữ liệu nào của server tới được client** (18 khung từ server đều là ACK
+     `tcp.len = 0`) và **0 gói ICMP** ⇒ **drop im lặng**, không phải PMTUD.
    Các cột c1–c7 và đối chứng thứ tự không bị ảnh hưởng. Điều rút ra vẫn đúng: rủi ro thuộc về
-   **kích thước vượt PMTU**, không phải đặc quyền của PQC. PQC chỉ **dịch ngưỡng an toàn**: X25519 cần PMTU ≳ 820 B
-   (giới hạn bởi flight server 767 B), trong khi hybrid cần PMTU ≳ 1450 B (giới hạn bởi ClientHello 1393 B
-   cộng 20 B IP và 32 B TCP có timestamp = 1445 B) — tức là đưa nhiều đường truyền thực tế
-   (VPN, tunnel, IPv6 tối thiểu 1280) vào vùng nguy hiểm.
+   **kích thước vượt PMTU**, không phải đặc quyền của PQC. PQC chỉ **dịch ngưỡng an toàn**: X25519 cần PMTU ≈ 821 B
+   (giới hạn bởi flight server 767 B ⇒ gói 819 B), trong khi hybrid cần PMTU **≥ 1500 B** — nút thắt
+   là **flight server**: segment lớn nhất 1448 B dữ liệu cộng 52 B header thành gói 1500 B
+   (ClientHello một mình chỉ cần 1445 B, xem Bảng 5). Ngưỡng bị dịch từ ~821 B lên ~1500 B, tức là
+   bao trùm nhiều đường truyền thực tế (VPN, tunnel, IPv6 tối thiểu 1280) vào vùng nguy hiểm.
 
 Đây là khoảng trống y văn mà chúng tôi tìm nhiều truy vấn khác nhau **không** thấy công trình
 nào lấp (xem mục 1.2). Khuyến nghị vận hành rút ra: **clamp MSS tại biên** và **không lọc
@@ -525,11 +537,12 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 
 ## 5. Hạn chế (threats to validity)
 
-1. **Offload ở endpoint vẫn bật.** Chúng tôi chỉ tắt GSO/TSO/GRO trên NIC của **router**; NIC của
-   client/server vẫn bật, nên cách **endpoint** chia packet không được quan sát trực tiếp — mọi
-   con số "cấp wire" trong báo cáo là cách chia ở **leg egress của router**. Đây đúng là loại
-   artifact đã làm sai kết luận ở bản v1 (và đã được ghi nhận công khai trong y văn kỹ thuật).
-   Hệ quả cụ thể: thí nghiệm ngưỡng PMTU ở mục 3.5 **chỉ** giới hạn được chiều client→server.
+1. **Offload ở endpoint vẫn bật, và thí nghiệm ngưỡng chỉ đo hai chế độ cụ thể.** Chúng tôi chỉ
+   tắt GSO/TSO/GRO trên NIC của **router**; NIC của client/server vẫn bật, nên cách **endpoint**
+   chia packet không được quan sát trực tiếp — mọi con số "cấp wire" là cách chia ở **leg egress
+   của router** (đúng loại artifact đã làm sai kết luận ở bản v1). Về ngưỡng PMTU (mục 3.5):
+   panel (b) đối xứng **đo được cả hai chiều** — và chính nó chỉ ra nút thắt là chiều về — nhưng
+   cả hai panel đều **cố định endpoint ở MTU 1500**, nên chưa đo trường hợp endpoint tự biết PMTU nhỏ.
 2. **Quy mô lab.** Một máy, liên kết veth không giới hạn băng thông, delay ≤ 50 ms. Chênh lệch
    RTT cỡ 0,2–0,4 ms là chi phí xử lý/segment của host, **không** đại diện cho Internet thật.
    Giá trị tuyệt đối thay đổi theo mức tải máy host (đo được 1,2–1,8 ms khi máy rảnh và
@@ -549,6 +562,10 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 5. **PMTUD**: mới ở PMTU 1280/1500/576 với một kiểu NAT (DNAT 1-1). Chưa đo ảnh hưởng của
    nhiều lớp NAT, IPv6, hay middlebox thật.
 6. **Không đo throughput lớn**: 6 site tổng hợp, không phải lưu lượng thật.
+7. **Sự cố vận hành ảnh hưởng phạm vi bằng chứng:** sweep đối xứng chạy sau đã **ghi đè pcap cùng
+   tên** của sweep bất đối xứng ở các MTU trùng nhau (1200, 1400). Với hai MTU đó chỉ còn **tỉ lệ
+   hoàn tất** (từ CSV), không còn pcap để kiểm hướng; mọi suy luận về hướng chỉ dựa trên các MTU
+   còn pcap. Ánh xạ được ghi tường minh trong `analysis/pmtud_threshold.py`.
 
 ---
 
@@ -600,7 +617,11 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
     Traffic Classifiers*, IEEE S&P 2025 (arXiv:2503.20093).
 16. Kassis, Agarwal, He, Patel, Brueckner, *Scientific Agent Skills: A Library of Procedural
     Knowledge for Research Agents*, arXiv:2609.00065, 2026.
-17. IETF, **RFC 2923** *TCP Problems with Path MTU Discovery*, Informational, 2000.
+17. IETF, **RFC 2923** *TCP Problems with Path MTU Discovery*, Informational, 2000; **RFC 7685**
+    *A TLS ClientHello Padding Extension*, Standards Track, 10/2015.
+    **golang/go issue #80573** (26/7/2026): ClientHello ~1,5 KB với ML-KEM/ML-DSA gây treo bắt tay
+    qua middlebox. Luồng **IETF TLS WG (2/2026)**: ClientHello 1396–1815 B trải nhiều TCP segment
+    "trigger middlebox issues".
 18. IETF, **RFC 8899** *Packetization Layer Path MTU Discovery for Datagram Transports*, 2020.
 19. Luckie & Stasiewicz, *Measuring Path MTU Discovery Behaviour*, ACM IMC 2012.
 20. Delgado, *Observability for Post-Quantum TLS Readiness: A Multi-Surface Evidence Framework*,
@@ -622,7 +643,7 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 | Trích xuất per-packet | `analysis/packets_all.tsv` (≈402 nghìn dòng) |
 | Phân tích | `analysis/rq1_analysis.py`, `rq23_analysis.py`, `rq2b_group_classifier.py`, `order_control.py`, `check_ch_budget.py` |
 | Kiểm định chéo | `analysis/audit_kiemdinh.py` → `tables/audit_results.csv` |
-| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (**199 mục**: Bảng 1–5, phân rã RTT, đối chứng thứ tự, bảng audit, số trong văn xuôi; thoát mã 1 nếu lệch) |
+| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (**279 mục**: Bảng 1–5, phân rã RTT, đối chứng thứ tự, bảng audit, số trong văn xuôi; thoát mã 1 nếu lệch) |
 | Ngưỡng PMTU đo được | `docker-lab/run_pmtud_threshold.sh` → `analysis/pmtud_threshold.py`, `tables/pmtud_threshold.json` |
 | Hồ sơ kiểm chứng | `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md` |
 | Sinh PDF | `analysis/md2pdf_report.py` |
