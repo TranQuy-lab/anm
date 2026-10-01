@@ -47,8 +47,11 @@ Bốn kết quả chính:
    (timeout 8 s), trong khi **X25519 vẫn 6/6**; chỉ cần bỏ một nhân tố (cho ICMP qua, hoặc bật
    clamp, hoặc MTU 1500) là **6/6 hoàn tất**. Capture ghi trực tiếp **6 gói ICMP type 3 code 4**
    ở nhánh "cho qua" và **0** ở nhánh "chặn" — bằng chứng nhân quả, không phải suy luận.
-   Ở PMTU 576, **cả X25519 cũng hỏng** (0/6): rủi ro thuộc về *kích thước vượt PMTU*, không
-   phải đặc quyền của PQC.
+   Ở PMTU 576, **cả X25519 cũng hỏng** (0/6), nhưng vì hai lý do khác nhau đã kiểm tra trong
+   pcap: hybrid là blackhole PMTUD (0 ICMP, ClientHello không tới server), còn X25519 là **drop
+   im lặng ở chiều server→client trước router**. Rủi ro thuộc về *kích thước vượt PMTU*, không
+   phải đặc quyền của PQC. Cuối cùng, **ngưỡng PMTU an toàn được đo trực tiếp**: hybrid hỏng ở
+   1440 B và qua ở 1448 B ⇒ cần **≥ 1445 B**, trong khi X25519 sống ở mọi mức từ 900 B.
 
 **Về khả năng nhận dạng lưu lượng:** chúng tôi **không** tuyên bố tính mới — quan sát thụ động
 phân biệt cổ điển/hậu lượng tử đã được công bố (arXiv:2503.17830; ePrint 2026/834;

@@ -3,7 +3,8 @@
 #
 # Nguyên tắc mù: KHÔNG tái sử dụng code/logic của rq*_analysis.py
 #   * trích xuất bằng `tshark -T json` (bản chính dùng -T fields)
-#   * định nghĩa flight theo TÍNH LIỀN KỀ SEQ RIÊNG TỪNG CHIỀU (bản chính dùng mốc thời gian)
+#   * định nghĩa flight theo BIÊN THỜI GIAN tường minh (t_ch → t_sv1 → t_cl2) trên từng chiều,
+#     thay vì dùng cửa sổ sự kiện của bản chính
 #   * client xác định theo cổng (≠4433) + subnet, KHÔNG dùng cờ SYN
 #   * nhóm KEM suy ra từ kích thước packet đầu tiên (ngưỡng 800 B), KHÔNG đọc nhãn CSV
 #
@@ -49,18 +50,6 @@ def extract(pcap):
         except (TypeError, ValueError):
             continue
     return pkts
-
-def clusters_by_time_gap(pkts, gap_ms=1.0):
-    ps = sorted(pkts, key=lambda q: q["t"])
-    if not ps: return []
-    clusters, cur = [], [ps[0]]
-    for p in ps[1:]:
-        if (p["t"] - cur[-1]["t"]) * 1000 > gap_ms:
-            clusters.append(cur); cur = [p]
-        else:
-            cur.append(p)
-    clusters.append(cur)
-    return clusters
 
 def stream_features(pkts):
     by = {}
@@ -254,8 +243,11 @@ if fl1500 and os.path.exists(csv_sites):
         true.append(1 if meta["group"].values[k] == "X25519MLKEM768" else 0)
     if pred:
         acc = float((np.array(pred) == np.array(true)).mean())
+        d_ok_min = len(pred) >= 100          # không cho PASS trên vài dòng khớp được
+        if not d_ok_min:
+            d_ok, d_msg = False, f"chỉ ghép được {len(pred)} flow (<100) — không đủ để kết luận"
         vals = sorted({x["c1"] for x in fl1500})
-        d_ok = (acc == 1.0) and (len(vals) == 2)
+        d_ok = (acc == 1.0) and (len(vals) == 2) and len(pred) >= 100
         d_msg = (f"accuracy = {acc:.4f} trên {len(pred)} flow (nhãn lấy từ CSV lần chạy, KHÔNG suy từ pcap) | "
                  f"packet đầu client chỉ nhận hai giá trị: {vals}")
 check("D", "Fingerprint mù: luật ngưỡng 800 B đối chiếu với nhãn nhóm ĐỘC LẬP", d_ok, d_msg)
