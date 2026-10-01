@@ -247,6 +247,9 @@ check("G", "Tính lại Mann–Whitney + Holm (họ hs_rtt) khớp bảng công 
 # ---------------------------------------------------------------- CHECK H: hoà giải 780 vs bắt được
 runs = []
 for f in sorted(glob.glob(os.path.join(LAB, "hs2_*.csv"))):
+    # chỉ tính CSV của MA TRẬN (hs2_L<loss>_D<delay>_M<mtu>_<group>), không tính đối chứng thứ tự
+    if not re.search(r"hs2_L\d+_D\d+_M\d+_(X25519|X25519MLKEM768)\.csv$", os.path.basename(f)):
+        continue
     runs.append(pd.read_csv(f))
 attempted = sum(len(d) for d in runs) if runs else 0
 rc0 = sum(int((d.exit_code == 0).sum()) for d in runs) if runs else 0
@@ -311,6 +314,24 @@ if os.path.exists(pm):
           " | ".join(lines))
 else:
     check("K", "Thí nghiệm PMTUD blackhole", None, "chưa chạy run_pmtud.sh")
+
+# ---------------------------------------------------------------- CHECK L: đối chứng thứ tự
+oc = os.path.join(BASE, "tables", "order_control.json")
+if os.path.exists(oc):
+    O = json.load(open(oc))
+    det, okL = [], True
+    for k, v in O.items():
+        if not k.startswith("MTU"):
+            continue
+        det.append(f"{k}: Δnhóm {v['delta_group_ms']:+.3f} ms (p={v['p_group']:.2g}), "
+                   f"Δvị trí {v['delta_order_ms']:+.3f} ms (p={v['p_order']:.2g})")
+        # hiệu ứng nhóm phải DƯƠNG và có ý nghĩa; hiệu ứng vị trí KHÔNG được có ý nghĩa
+        if not (v["delta_group_ms"] > 0 and v["p_group"] < 0.05 and v["p_order"] > 0.05):
+            okL = False
+    check("L", "Đối chứng thứ tự ngẫu nhiên: hiệu ứng NHÓM tái lập, hiệu ứng VỊ TRÍ không đáng kể",
+          okL, " | ".join(det))
+else:
+    check("L", "Đối chứng thứ tự ngẫu nhiên", None, "chưa chạy run_order_control.sh")
 
 # ---------------------------------------------------------------- tổng kết
 print("=" * 70)

@@ -33,10 +33,13 @@ Bốn kết quả chính:
 3. **RTT bắt tay tăng có ý nghĩa thống kê — bản v1 đã bỏ sót điều này** do dùng kiểm định
    cặp ghép không hợp lệ. Với Mann–Whitney U + hiệu chỉnh Holm trên thiết kế xen kẽ, trung vị
    RTT của nhóm lai cao hơn ở **11/13** cấu hình (sign test p = 0,011) và **có ý nghĩa sau Holm
-   ở 4/13** cấu hình, mức tăng **0,17–0,40 ms (≈ 15–35%)** trên testbed cục bộ. Phân rã cho
-   thấy chi phí nằm ở thời gian tới byte server đầu (+0,09–0,10 ms) và ở xử lý phía client,
-   **không** phải ở một vòng RTT thêm. Trên đường truyền RTT ~100 ms, mức tăng tuyệt đối vẫn
-   cỡ 0,4 ms nên ảnh hưởng tương đối không đáng kể.
+   ở 4/13** cấu hình, mức tăng **0,17–0,40 ms (≈ 15–35%)** trên testbed cục bộ. Một **thí nghiệm
+   đối chứng có đảo thứ tự ngẫu nhiên** (n = 60 cặp/nhóm) xác nhận hiệu ứng này và cho ước lượng
+   sạch hơn: **+0,33…0,36 ms, Cliff's δ ≈ 0,85–0,90, p ≈ 10⁻¹⁷**, trong khi hiệu ứng *vị trí*
+   trong cặp (chạy thứ nhất vs thứ hai) **không đáng kể** (p = 0,14 và 0,45) — tức kết luận
+   không bị nhiễu bởi thứ tự chạy. Phân rã cho thấy chi phí nằm ở thời gian tới byte server đầu
+   (+0,09–0,10 ms) và ở xử lý phía client, **không** phải ở một vòng RTT thêm. Trên đường truyền
+   RTT ~100 ms, mức tăng tuyệt đối vẫn cỡ 0,2–0,4 ms nên ảnh hưởng tương đối không đáng kể.
 
 4. **Đóng góp mới: blackhole PMTUD cho bắt tay hậu lượng tử, tái hiện có kiểm soát.** Trong
    thí nghiệm nhân tố {nhóm KEM} × {PMTU} × {cho qua/chặn ICMP frag-needed} × {MSS clamp},
@@ -129,6 +132,11 @@ hình 30 lần lặp. Trong mỗi lần lặp, hai nhóm chạy **luân phiên t
 một cấu hình mạng** (`hs_loop2.sh`), nên chỉ số `rep` là khoá ghép cặp hợp lệ và mọi trôi hệ
 thống theo thời gian được chia đều cho hai nhóm. Bản v1 chạy hai khối tuần tự rồi ghép cặp
 theo thứ tự dòng — đó là lỗi thiết kế, không phải lựa chọn phân tích.
+
+Vì ma trận chính luôn cho X25519 chạy **trước** trong mỗi cặp, chúng tôi chạy thêm một
+**đối chứng đảo thứ tự ngẫu nhiên** (`run_order_control.sh`, `ORDER=random`) ở MTU 1500 và
+1280, n = 60 cặp/nhóm. Đối chứng này khử được yếu tố thứ tự, và cho phép kiểm tra riêng xem
+bản thân "chạy thứ hai" có chậm hơn không (`analysis/order_control.py`).
 
 ### 2.3 Thống kê
 
@@ -263,6 +271,25 @@ Tức là phần lớn chi phí nằm ở **thời gian để byte server đầu
 việc server phải mã hóa và truyền một flight lớn hơn (1846 B so với 767 B), chứ không phải
 một vòng khứ hồi phụ.
 
+**Đối chứng thứ tự (loại trừ nhiễu do thứ tự chạy).** Ma trận chính luôn cho X25519 chạy trước,
+nên cần kiểm tra riêng xem "chạy thứ hai" có chậm hơn một cách hệ thống không. Thí nghiệm đảo
+thứ tự ngẫu nhiên, n = 60 cặp/nhóm:
+
+| MTU | X25519 | X25519MLKEM768 | Δ nhóm | p (nhóm) | Cliff's δ | Δ vị trí (2 − 1) | p (vị trí) |
+|---|---|---|---|---|---|---|---|
+| 1280 | 2,730 ms | 3,088 ms | **+0,358 ms** | **1,9·10⁻¹⁷** | 0,90 | +0,212 ms | 0,14 (n.s.) |
+| 1500 | 2,787 ms | 3,118 ms | **+0,331 ms** | **1,8·10⁻¹⁵** | 0,84 | −0,023 ms | 0,45 (n.s.) |
+
+Phân rã 2×2 xác nhận tính tách bạch: hiệu ứng **nhóm** ổn định trong cả hai vị trí
+(+0,344…+0,387 ms), còn hiệu ứng **vị trí** tính trong từng nhóm chỉ 0,01–0,07 ms. Nhãn vị trí
+được lấy **trực tiếp từ CSV lần chạy** (không suy ra bằng ghép cặp theo thời gian); chạy lại với
+cách ghép cặp tham lam theo thời gian cho kết quả giống hệt, tức kết luận không phụ thuộc cách ghép.
+Kết luận:
+kết quả RTT **không** bị nhiễu bởi thứ tự chạy; với cỡ mẫu lớn hơn, hiệu ứng nhóm thậm chí
+mạnh hơn ước lượng từ ma trận (δ ≈ 0,85–0,90 = hiệu ứng lớn). Lưu ý các giá trị tuyệt đối
+giữa hai lần chạy khác nhau (2,7–3,1 ms so với 1,2–1,8 ms) vì mức tải của máy host khác nhau —
+chỉ nên so sánh **trong cùng một lần chạy**.
+
 ![Hình 1 — RTT bắt tay theo mức mất gói](analysis/figs/fig1_rtt_loss.png)
 
 ### 3.4 Độ tin cậy và retransmission
@@ -364,7 +391,7 @@ Toàn bộ hồ sơ ở `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md`. Tóm tắ
    **6 công trình tiền lệ** chiếm mất các tuyên bố "đầu tiên".
 
 Kết quả audit tự động (`analysis/audit_kiemdinh.py`, output `tables/audit_results.csv`):
-**12/12 hạng mục PASS, 0 FAIL, 0 WARN** (bảng đầy đủ: `tables/audit_results.csv`):
+**13/13 hạng mục PASS, 0 FAIL, 0 WARN** (bảng đầy đủ: `tables/audit_results.csv`):
 
 | # | Lược kiểm | Kết quả |
 |---|---|---|
@@ -380,6 +407,7 @@ Kết quả audit tự động (`analysis/audit_kiemdinh.py`, output `tables/aud
 | I | Toàn vẹn thiết kế xen kẽ: hai nhóm cân bằng, xen kẽ | **PASS** — 30/30 mỗi cấu hình; lệch SYN trong cặp ~165 ms |
 | J | Phân mảnh cấp wire tăng theo PQC và theo MTU nhỏ | **PASS** — M1500 1→2; M1280 2→4; M576 3→7 segment (tổng) |
 | K | PMTUD blackhole có kiểm soát | **PASS** — c1 0/6, c2–c7 6/6, c8 và c9 0/6 |
+| L | Đối chứng thứ tự ngẫu nhiên: hiệu ứng nhóm tái lập, hiệu ứng vị trí không đáng kể | **PASS** — Δnhóm +0,358/+0,331 ms (p ≈ 10⁻¹⁷); Δvị trí p = 0,14/0,45 |
 
 Ba hạng mục của bản v1 đã được **sửa vì chúng tự tham chiếu hoặc vô hiệu**:
 C (so với chính giá trị đo được), E (so với ngưỡng tuỳ ý 0,30 thay vì mức ngẫu nhiên 1/6),
@@ -390,8 +418,12 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 ## 5. Hạn chế (threats to validity)
 
 1. **Quy mô lab.** Một máy, liên kết veth không giới hạn băng thông, delay ≤ 50 ms. Chênh lệch
-   RTT cỡ 0.2–0.4 ms là chi phí xử lý/segment của host, **không** đại diện cho Internet thật.
-   Kết quả PMTUD là hiện tượng giao thức, có thể khái quát hơn — nhưng vẫn cần đo ngoài Internet.
+   RTT cỡ 0,2–0,4 ms là chi phí xử lý/segment của host, **không** đại diện cho Internet thật.
+   Giá trị tuyệt đối thay đổi theo mức tải máy host (đo được 1,2–1,8 ms khi máy rảnh và
+   2,7–3,1 ms khi máy bận) nên chỉ so sánh **trong cùng một lần chạy** — và đó là điều thiết
+   kế xen kẽ bảo đảm. Hiệu ứng *vị trí* trong cặp đã được kiểm riêng và **không đáng kể**
+   (p = 0,14 và 0,45 ở n = 60 cặp/nhóm). Kết quả PMTUD là hiện tượng giao thức, có thể khái
+   quát hơn — nhưng vẫn cần đo ngoài Internet.
 2. **Fixture phân loại tầm thường.** 6 site có kích thước cố định nên 1-NN một đặc trưng đã
    đạt 1.000. Vì vậy kết quả "classifier kháng drift" **không** được trình bày như phát hiện;
    chỉ phần ranh giới họ đặc trưng được giữ.
@@ -462,11 +494,11 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 
 | Artifact | Đường dẫn |
 |---|---|
-| Testbed tái lập được (v2, xen kẽ + MTU thật) | `docker-lab/` — `run_matrix2.sh`, `run_pmtud.sh`, `run_ch_budget.sh`, `pqc-node/{role,hs_loop2,sites_loop2,capture}.sh` |
+| Testbed tái lập được (v2, xen kẽ + MTU thật) | `docker-lab/` — `run_matrix2.sh`, `run_pmtud.sh`, `run_ch_budget.sh`, `run_order_control.sh`, `pqc-node/{role,hs_loop2,sites_loop2,capture}.sh` |
 | Dữ liệu thô v2 | `docker-lab/results/pcap2_*.pcapng`, `hs2_*.csv`, `sites2_M*.csv`, `pmtud_trials.csv` |
 | Dữ liệu thô v1 (lưu trữ, capture bị GSO che) | `docker-lab/results/archive_gso_capture/`, `analysis/packets_all_gso.tsv` |
 | Trích xuất per-packet | `analysis/packets_all.tsv` (≈402 nghìn dòng) |
-| Phân tích | `analysis/rq1_analysis.py`, `rq23_analysis.py`, `rq2b_group_classifier.py`, `check_ch_budget.py` |
+| Phân tích | `analysis/rq1_analysis.py`, `rq23_analysis.py`, `rq2b_group_classifier.py`, `order_control.py`, `check_ch_budget.py` |
 | Kiểm định chéo | `analysis/audit_kiemdinh.py` → `tables/audit_results.csv` |
 | Hồ sơ kiểm chứng | `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md` |
 | Sinh PDF | `analysis/md2pdf_report.py` |

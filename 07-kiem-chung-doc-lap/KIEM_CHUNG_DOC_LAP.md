@@ -135,7 +135,28 @@ trống này**, không tuyên bố "đầu tiên" ở chỗ đã có người l�
 
 ---
 
-## 4. Những gì KHÔNG sửa được / còn nghi vấn
+## 5. Vòng tự kiểm chứng bổ sung sau khi sửa: nghi vấn "thứ tự chạy"
+
+Sau khi đã sửa và chạy lại toàn bộ, chúng tôi tự đặt thêm một câu hỏi đối kháng mà **chưa**
+vòng phản biện nào nêu: *"Trong mỗi cặp, X25519 luôn chạy trước. Nếu bản thân việc chạy thứ hai
+đã chậm hơn, kết luận 'nhóm lai chậm hơn' có thể chỉ là hiệu ứng thứ tự."*
+
+- **Cách kiểm.** `run_order_control.sh` chạy lại hai cấu hình mạng sạch ở MTU 1500 và 1280 với
+  **thứ tự hai nhóm đảo ngẫu nhiên** cho từng cặp (`ORDER=random`), n = 60 cặp/nhóm;
+  `analysis/order_control.py` phân rã 2×2 (hiệu ứng nhóm *trong* từng vị trí, và hiệu ứng vị trí
+  *trong* từng nhóm).
+- **Kết quả lần đầu (n = 30 cặp/MTU)** cho thấy một hiệu ứng vị trí trông đáng kể (+0,14…+0,20 ms,
+  p = 0,08/0,014) — đủ để nghi ngờ chính kết luận RTT của mình. Vì vậy chúng tôi **tăng cỡ mẫu**
+  lên 60 cặp/nhóm và chạy lại.
+- **Kết quả cuối:** hiệu ứng **nhóm** +0,358 ms (MTU 1280) và +0,331 ms (MTU 1500),
+  **p ≈ 10⁻¹⁷ và 10⁻¹⁵**, Cliff's δ ≈ 0,85–0,90 (hiệu ứng lớn); hiệu ứng **vị trí** +0,212 ms
+  (p = 0,14) và −0,023 ms (p = 0,45) — **không đáng kể**. Phân rã 2×2 cho thấy hiệu ứng nhóm ổn
+  định ở cả hai vị trí (+0,344…+0,387 ms), còn hiệu ứng vị trí trong từng nhóm chỉ 0,01–0,07 ms.
+- **Kết luận.** Nghi vấn được **loại trừ**; kết luận RTT đứng vững và thực ra **mạnh hơn** ước
+  lượng ban đầu. Ghi chú phương pháp: hiệu ứng vị trí ở lần chạy nhỏ là **nhiễu do cỡ mẫu**,
+  và bài học là phải tăng mẫu trước khi kết luận về một confound — chứ không phải bỏ qua nó.
+
+## 6. Những gì KHÔNG sửa được / còn nghi vấn
 
 1. **Snaplen 160 của dataset v1** làm mọi kiểm tra mức payload bất khả thi. Bản 2 vẫn giữ
    `-s 160` cho ma trận (đủ cho `tcp.len`/phân mảnh) nhưng dùng capture **snaplen đầy đủ**
@@ -154,12 +175,12 @@ trống này**, không tuyên bố "đầu tiên" ở chỗ đã có người l�
 
 ---
 
-## 5. Bảng đối chiếu v1 → v2
+## 7. Bảng đối chiếu v1 → v2
 
 | Hạng mục | v1 | v2 |
 |---|---|---|
 | Thiết kế RQ1 | hai khối tuần tự, "ghép cặp" giả | **xen kẽ ABAB**, ghép cặp theo `rep` |
-| Kiểm định RTT | Wilcoxon paired (sai) | Mann–Whitney + permutation + bootstrap CI + Cliff's δ |
+| Kiểm định RTT | Wilcoxon paired (sai) | Mann–Whitney + permutation + bootstrap CI + Cliff's δ **+ đối chứng đảo thứ tự ngẫu nhiên** |
 | MTU | bị GSO che (gói 1847 B qua link 576) | offload tắt, cảnh báo nếu thiếu ethtool |
 | Phân mảnh | suy luận từ tổng byte | **đo số segment cấp wire** |
 | Capture | `tcpdump -i any`, mất ~25% gói | **dumpcap**, 2 interface, 780/780 |

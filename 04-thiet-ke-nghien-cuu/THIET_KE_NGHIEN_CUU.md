@@ -65,9 +65,11 @@
 2. `rq1_analysis.py` → byte, phân mảnh cấp wire, RTT + phân rã, thống kê
 3. `rq23_analysis.py` → drift (cùng MTU, đổi MTU), thích ứng, ranh giới họ đặc trưng
 4. `rq2b_group_classifier.py` → quan sát tối thiểu để nhận diện nhóm KEM + độ bền theo MTU
-5. `check_ch_budget.py` → đối chiếu key_share với FIPS 203
-6. `audit_kiemdinh.py` → 13 hạng mục kiểm định chéo độc lập
-7. `md2pdf_report.py` → PDF
+5. `order_control.py` → tách bạch hiệu ứng **nhóm** và hiệu ứng **vị trí** trong cặp
+   (phòng ngừa confound: ma trận chính luôn cho X25519 chạy trước)
+6. `check_ch_budget.py` → đối chiếu key_share với FIPS 203
+7. `audit_kiemdinh.py` → 13 hạng mục kiểm định chéo độc lập
+8. `md2pdf_report.py` → PDF
 
 ## 6. Sai khác so với kế hoạch v1 (ghi trung thực)
 
