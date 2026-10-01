@@ -554,6 +554,7 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 | Trích xuất per-packet | `analysis/packets_all.tsv` (≈402 nghìn dòng) |
 | Phân tích | `analysis/rq1_analysis.py`, `rq23_analysis.py`, `rq2b_group_classifier.py`, `order_control.py`, `check_ch_budget.py` |
 | Kiểm định chéo | `analysis/audit_kiemdinh.py` → `tables/audit_results.csv` |
+| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (98 mục, thoát mã 1 nếu lệch) |
 | Hồ sơ kiểm chứng | `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md` |
 | Sinh PDF | `analysis/md2pdf_report.py` |
 

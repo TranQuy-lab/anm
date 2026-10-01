@@ -49,7 +49,8 @@ nên gồm hai việc cụ thể: **clamp MSS tại biên** và **không lọc I
 │       ├── rq23_analysis.py          RQ2/RQ3: drift, thích ứng, ranh giới họ đặc trưng
 │       ├── rq2b_group_classifier.py  Quan sát tối thiểu để nhận diện nhóm KEM
 │       ├── check_ch_budget.py        Bóc key_share từ capture snaplen đầy đủ
-│       ├── audit_kiemdinh.py         Kiểm định chéo tự động (13 hạng mục)
+│       ├── audit_kiemdinh.py         Kiểm định chéo tự động (15 hạng mục)
+│       ├── check_report_numbers.py   Chặn lỗi chép tay: báo cáo ↔ dữ liệu thô
 │       ├── md2pdf_report.py          Sinh PDF từ Markdown
 │       ├── tables/                   Bảng kết quả (CSV/JSON)
 │       └── figs/                     Hình dùng trong báo cáo
@@ -94,7 +95,8 @@ python rq1_analysis.py               # byte, phân mảnh cấp wire, RTT + th�
 python rq23_analysis.py              # drift, thích ứng, ranh giới họ đặc trưng
 python rq2b_group_classifier.py      # quan sát tối thiểu để nhận diện nhóm KEM
 python order_control.py              # tách bạch hiệu ứng NHÓM vs hiệu ứng VỊ TRÍ
-python audit_kiemdinh.py             # 13 hạng mục kiểm định chéo độc lập
+python audit_kiemdinh.py             # 15 hạng mục kiểm định chéo độc lập
+python check_report_numbers.py       # đối chiếu MỌI con số trong báo cáo với dữ liệu thô
 python md2pdf_report.py              # (tuỳ chọn) sinh lại PDF
 ```
 
