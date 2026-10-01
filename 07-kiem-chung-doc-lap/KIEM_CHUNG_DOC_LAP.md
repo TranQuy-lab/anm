@@ -70,8 +70,8 @@ Hai tầng 2 và 3 **hội tụ độc lập về cùng một kết luận** ở
 - **Sự thật (đo trực tiếp từ capture snaplen đầy đủ, giải mã TLS).**
   - ClientHello: key_share hybrid = **1216 B** = ek(ML-KEM-768) **1184** + X25519 **32** ⇒ khớp FIPS 203.
   - ServerHello: key_share hybrid = **1120 B** = ct **1088** + X25519 **32** ⇒ khớp FIPS 203.
-  - ΔClientHello tổng = +1176 = 1184 − 8 vì nhóm hybrid **bỏ extension `ec_point_formats`**.
-  - Δflight server = +1076…1078 ≈ 1088 − 10 (bỏ `ec_point_formats` trong EncryptedExtensions) ± độ dài chữ ký ECDSA.
+  - ΔClientHello tổng = +1176 = 1184 − 8 vì nhóm hybrid **bỏ `ec_point_formats`** (extension này chỉ có ở ClientHello).
+  - Δflight server = +1075…1080 ≈ 1088 − 10 (bỏ `supported_groups` trong EncryptedExtensions; ±1 B độ dài chữ ký ECDSA mỗi phía).
 - **Sửa.** `check_ch_budget.py` bóc tách key_share thật; audit check C/C2 đối chiếu với
   1184/1088 và giải thích phần chênh còn lại. Toàn bộ ngân sách byte được **giải thích
   từng byte**, không còn con số "0.0%" tự quy chiếu.
@@ -190,7 +190,7 @@ chữa gây ra. Kết quả và cách xử lý:
 |---|---|---|
 | Check D của audit **tự quy chiếu** ("sự thật" định nghĩa bằng chính ngưỡng đang kiểm ⇒ accuracy luôn 1,0, không bao giờ FAIL) | CRITICAL | Thay bằng phép kiểm thật: luật ngưỡng 800 B đối chiếu **nhãn nhóm đọc từ CSV lần chạy** |
 | Bảng §4 của báo cáo **chép tay sai** so với `audit_results.csv` (placebo 0,070 vs 0,080; mô tả check J) | CRITICAL | Sửa cho khớp từng ô; bảng phải sinh từ file kết quả, không chép tay |
-| Hai ô PMTUD ở PMTU 576 **đo sai cơ chế** (hướng server→client vượt MTU trước router ⇒ 0 gói ICMP ⇒ drop im lặng, không phải PMTUD blackhole) | CRITICAL | Dán nhãn lại; kết luận c1/c2 không đổi |
+| Ô PMTUD **c9** (X25519, 576) đo sai cơ chế (hướng server→client vượt MTU trước router ⇒ 0 gói ICMP ⇒ drop im lặng, không phải PMTUD blackhole). **c8 (hybrid, 576) thì đúng là blackhole PMTUD** — vòng 3 chỉ ra rằng nhãn cũ đã bị gán sai lan sang cả c8 | CRITICAL | Dán nhãn lại: chỉ c9 là drop im lặng; c8 cùng loại với c1 |
 | Test "hiệu ứng vị trí" bị **confound thành phần** | MAJOR | Chuyển sang sai khác **trong từng nhóm**; bỏ tiêu chí sai khỏi audit |
 | `rq2b` tuyên bố "packet đầu bất biến theo MTU" — thực ra là **artifact GSO ở leg ingress** | MAJOR | Thêm `wire_cl_first` (leg egress); bất biến chỉ giữ cho **tổng byte flight** |
 | Audit cho **PASS rỗng** khi thiếu dữ liệu (H, I); J đọc lại bảng công bố thay vì pcap | MAJOR | H/I trả WARN khi thiếu dữ liệu, FAIL khi có `rc≠0`; J tính lại từ pcap trên leg egress |
@@ -198,6 +198,22 @@ chữa gây ra. Kết quả và cách xử lý:
 | Chi tiết nhỏ: thiếu ChangeCipherSpec trong mô tả flight; làm tròn 8,60 vs 8,59; `sv_spread` bị bỏ sót; sign test một phía; "≈ ngẫu nhiên" cho 0,58–0,59; `docker-lab/README.md` còn văn phong v1 | MINOR | Đã sửa toàn bộ; `sv_spread` nay được báo cáo như một góc nhìn của cùng cơ chế phân mảnh |
 
 Sau tất cả các sửa, audit tự động đạt **15/15 PASS** (thêm check C3 và check K2 — kiểm chứng chuỗi nhân quả PMTUD trực tiếp trong pcap).
+
+## 7. Vòng phản biện thứ ba — và các lỗi do chính vòng 2 gây ra
+
+Vòng 3 phản biện **bản đã sửa hai lần** và tìm ra:
+
+| Phát hiện | Mức | Đã sửa |
+|---|---|---|
+| **Cơ chế −10 B ở EncryptedExtensions bị gán sai extension**: không phải `ec_point_formats` mà là `supported_groups` (type 10, 4 B header + 6 B dữ liệu). Giải mã EE cho thấy X25519 EE chứa **duy nhất** `supported_groups`, hybrid EE rỗng | CRITICAL | Sửa ở báo cáo, README, hồ sơ và cả **tên check C3**; C3 nay còn **đọc tên extension** để tự chứng minh |
+| `check_report_numbers.py` (công cụ chống chép tay của vòng 2) là **con dấu cao su**: chỉ kiểm Bảng 3/4 và sự tồn tại của 15 dòng audit; 10/11 phép sửa thử đều lọt | CRITICAL | Mở rộng lên **199 mục** (Bảng 1–5, phân rã RTT, đối chứng thứ tự, bảng audit, số trong văn xuôi), so theo **chữ số có nghĩa**; kiểm tra âm: bắt **12/14** phép sửa thử (2 ca còn lại là mẫu thử không tồn tại trong văn bản) |
+| Nhãn "đo sai cơ chế" của vòng 2 bị gán **lan sang cả c8**: c8 (hybrid@576) thực ra **đúng là blackhole PMTUD** như c1, chỉ c9 mới là drop im lặng | MAJOR | Dán nhãn lại; **mở rộng check K2** để tự động bảo chứng cho c1, c2, c8, c9 từ pcap |
+| Audit còn **PASS rỗng**: check B PASS trên dữ liệu rỗng; check I bỏ qua `exit_code` và không đòi đủ cấu hình/MTU; tiêu chí I dùng trung vị gộp nên bất ổn | MAJOR | B trả WARN khi n=0; I kiểm **theo từng cấu hình** + đọc `exit_code` + đòi đủ 13 cấu hình; J đòi đủ 3 MTU. Kiểm tra âm (ẩn 1 pcap): I và J **FAIL** đúng như mong đợi |
+| **47% số đo `wire_cl_*` bị NaN**: ghép leg egress bằng cửa sổ 20 ms trong khi cấu hình delay 50 ms có độ trễ 50 ms | MAJOR | Thêm `tcp.seq_raw` vào extraction và ghép leg theo **số sequence tuyệt đối**; nay **0/780 NaN** |
+| Ngưỡng "hybrid cần PMTU ≳ 1450 B" chỉ là **ngoại suy** | MAJOR | Thêm `run_pmtud_threshold.sh` + `pmtud_threshold.py`: **đo trực tiếp** ngưỡng (hybrid hỏng ở 1440, qua ở 1448 ⇒ ngưỡng 1445 B; X25519 sống ở mọi mức từ 900 B) |
+| p-value nhị thức trong abstract **phản-bảo-thủ** (288 flow gần trùng nhau) | MAJOR | Bỏ p-value, giữ mô tả định lượng + nêu rõ lý do |
+| Ô drift "bắt tay thuần" ở cột MTU 1280 ghi 0,188 (giá trị của MTU 1500) | MAJOR | Sửa thành 0,167; thêm `within1280_handshake` vào `rq23_summary.json` |
+| **Tiền lệ PMTUD nói chung** (RFC 2923, RFC 8899, Luckie & Stasiewicz IMC 2012) không được trích | MAJOR | Bổ sung và **thu hẹp tuyên bố** thành "chưa đo **cho bắt tay PQC**" |.
 
 ## 7. Bảng đối chiếu v1 → v2
 

@@ -26,13 +26,13 @@ N_BOOT = 10000
 
 def load_packets(path):
     df = pd.read_csv(path, sep="\t", header=None, skiprows=1)
-    df.columns = ["pcap","stream","time","src","dst","tcplen","seq","ack","retrans","syn","fin","rst"]
+    df.columns = ["pcap","stream","time","src","dst","tcplen","seq","ack","retrans","syn","fin","rst","seqraw"]
     for c in ("retrans","syn","fin","rst"):
         # tshark in boolean dưới HAI dạng tuỳ field: "True"/"False" (cờ TCP) và "1"/rỗng
         # (tcp.analysis.retransmission). Phải xử lý cả hai, nếu không retrans luôn = 0.
         df[c] = pd.to_numeric(df[c].replace({"True":1,"False":0,"true":1,"false":0}), errors="coerce") \
                   .fillna(0).astype(int)
-    for c in ("time","tcplen","seq","ack"):
+    for c in ("time","tcplen","seq","ack","seqraw"):
         df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
 
@@ -71,7 +71,10 @@ def index_streams(g_all):
         idx.append(dict(stream=st, g=g,
                         src0=str(g["src"].iloc[0]), dst0=str(g["dst"].iloc[0]),
                         syn_src=str(synp["src"].iloc[0]) if len(synp) else None,
-                        syn_seq=float(synp["seq"].iloc[0]) if len(synp) else np.nan,
+                        # seq_raw là số TUYỆT ĐỐI và được giữ nguyên qua DNAT ⇒ khoá ghép leg
+                        # chính xác, không phụ thuộc netem delay (ghép theo mốc thời gian đã
+                        # làm mất 47% số đo wire ở các cấu hình delay 50 ms).
+                        syn_seq=float(synp["seqraw"].iloc[0]) if len(synp) else np.nan,
                         t0=float(g["time"].min())))
     return idx
 
@@ -109,7 +112,9 @@ def connection_features(legs):
         for M in legs:
             if M is L or M["syn_src"] is None:
                 continue
-            if M["src0"].startswith("172.30.20.") and abs(M["t0"] - L["t0"]) < 0.02:
+            same_syn = (not np.isnan(L["syn_seq"]) and not np.isnan(M["syn_seq"])
+                        and L["syn_seq"] == M["syn_seq"])
+            if M["src0"].startswith("172.30.20.") and (same_syn or abs(M["t0"] - L["t0"]) < 0.02):
                 egr, egr_src = M["g"], M["src0"]; break
         wire_cl_nseg = wire_cl_bytes = wire_cl_first = np.nan
         if egr is not None:

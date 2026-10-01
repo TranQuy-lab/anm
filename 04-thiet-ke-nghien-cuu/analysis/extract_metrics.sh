@@ -18,7 +18,7 @@ case "$MODE" in
   *)    PATTERN="$MODE"; OUT="${2:-packets_all.tsv}" ;;
 esac
 
-echo -e "pcap\tstream\ttime\tsrc\tdst\ttcplen\tseq\tack\tretrans\tsyn\tfin\trst" > "$OUT"
+echo -e "pcap\tstream\ttime\tsrc\tdst\ttcplen\tseq\tack\tretrans\tsyn\tfin\trst\tseqraw" > "$OUT"
 shopt -s nullglob
 FILES=()
 for f in "$LABDIR"/results/*.pcapng "$LABDIR"/results/archive_gso_capture/*.pcapng; do
@@ -32,6 +32,7 @@ for f in "${FILES[@]}"; do
   tshark -r "$f" -Y 'tcp' -T fields \
     -e tcp.stream -e frame.time_epoch -e ip.src -e ip.dst -e tcp.len -e tcp.seq -e tcp.ack \
     -e tcp.analysis.retransmission -e tcp.flags.syn -e tcp.flags.fin -e tcp.flags.reset \
+    -e tcp.seq_raw \
     2>/dev/null | awk -v n="$name" -F'\t' 'NF>=11{OFS="\t"; print n,$0}' >> "$OUT"
 done
 echo "[extract] $OUT: $(wc -l < "$OUT") dòng (gồm header)"

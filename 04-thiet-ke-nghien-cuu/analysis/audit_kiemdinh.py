@@ -141,8 +141,10 @@ for _ in range(200):
     idx = rng.permutation(len(tot)); h = len(tot)//2
     hits += mwu_p(tot[idx[:h]], tot[idx[h:]]) < 0.05
 fp = hits/200
-check("B", "Placebo: chia đôi ngẫu nhiên CÙNG nhóm (L3_D50_M1280), 200 lần → p<0.05 ≈ 5%", fp <= 0.10,
-      f"tỷ lệ dương tính giả = {fp:.3f}")
+# n=0 thì KHÔNG được PASS (bản trước trả 0.000 và PASS trên dữ liệu rỗng)
+check("B", "Placebo: chia đôi ngẫu nhiên (trộn hai nhóm, L3_D50_M1280), 200 lần → p<0.05 ≈ 5%",
+      (fp <= 0.10) if len(tot) >= 20 else None,
+      (f"tỷ lệ dương tính giả = {fp:.3f} (n={len(tot)} flow)" if len(tot) else "KHÔNG có dữ liệu — không kết luận"))
 
 # ---------------------------------------------------------------- CHECK C: FIPS 203
 d_cli = ch_pure["X25519MLKEM768"] - ch_pure["X25519"]
@@ -150,7 +152,7 @@ d_srv = mine["X25519MLKEM768"][1] - mine["X25519"][1]
 EK, CT = 1184, 1088            # FIPS 203, ML-KEM-768: encapsulation key / ciphertext
 okC = abs(d_cli - (EK - 8)) <= 2 and abs(d_srv - (CT - 10)) <= 4
 detail = (f"ΔClientHello +{d_cli:.0f}B = ek {EK} − 8 (extension ec_point_formats bị bỏ ở nhóm hybrid) | "
-          f"Δflight server +{d_srv:.0f}B ≈ ct {CT} − 10 (ec_point_formats bị bỏ trong EncryptedExtensions) "
+          f"Δflight server +{d_srv:.0f}B ≈ ct {CT} − 10 (supported_groups bị bỏ trong EncryptedExtensions) "
           f"± dao động độ dài chữ ký ECDSA")
 if os.path.exists(os.path.join(LAB, "pcap_full_X25519MLKEM768.pcapng")):
     detail += " | đo trực tiếp key_share (capture snaplen đầy đủ): xem check C2"
@@ -173,8 +175,9 @@ except Exception as e:
     check("C2", "Bóc key_share từ capture đầy đủ", None, f"bỏ qua: {e}")
 
 # ---------------------------------------------------------------- CHECK C3: giải mã EncryptedExtensions
-# Phần −10 B của Δflight server được gán cho việc nhóm lai BỎ extension ec_point_formats trong
-# EncryptedExtensions. Kiểm chứng độc lập: dùng keylog khớp pcap để giải mã và so độ dài EE.
+# Phần −10 B của Δflight server được gán cho việc nhóm lai BỎ extension supported_groups (type 10)
+# trong EncryptedExtensions. Kiểm chứng độc lập: giải mã bằng keylog, so độ dài EE **và đọc tên
+# extension** để chắc chắn tên được nêu trong báo cáo là đúng.
 def ee_len(pcap, keylog):
     """Độ dài EncryptedExtensions. Một frame có thể chứa NHIỀU handshake message nên phải
     căn theo chỉ số: tìm vị trí type==8 trong danh sách type rồi lấy length cùng chỉ số."""
@@ -194,6 +197,24 @@ def ee_len(pcap, keylog):
                 return int(lens[i])
     return None
 
+def ee_ext_names(pcap, keylog):
+    """Tên các extension trong EncryptedExtensions (để kiểm chứng TÊN mà báo cáo nêu ra).
+    Một frame có thể chứa cả ServerHello lẫn EE nên phải cắt phần sau 'Encrypted Extensions'."""
+    out = subprocess.run(["tshark", "-r", pcap, "-o", f"tls.keylog_file:{keylog}",
+                          "-Y", "tls.handshake.type==8", "-V"],
+                         capture_output=True, text=True).stdout
+    if "Encrypted Extensions" not in out:
+        return None
+    tail = out.split("Encrypted Extensions", 1)[1]
+    names = []
+    for line in tail.splitlines():
+        st = line.strip()
+        if st.startswith("Handshake Protocol:") and "Encrypted Extensions" not in st:
+            break
+        if st.startswith("Extension: "):
+            names.append(st.split("Extension: ", 1)[1].split(" ", 1)[0])
+    return names
+
 try:
     ee = {}
     for G in ("X25519", "X25519MLKEM768"):
@@ -202,10 +223,14 @@ try:
         if not (os.path.exists(pc) and os.path.exists(kl)):
             raise FileNotFoundError(pc if not os.path.exists(pc) else kl)
         ee[G] = ee_len(pc, kl)
+    names = {G: ee_ext_names(os.path.join(LAB, f"pcap_full_{G}.pcapng"), os.path.join(LAB, f"keys_{G}.log"))
+             for G in ("X25519", "X25519MLKEM768")}
     okC3 = (ee.get("X25519") is not None and ee.get("X25519MLKEM768") is not None
-            and ee["X25519"] - ee["X25519MLKEM768"] == 10)
-    check("C3", "Giải mã EE bằng keylog: nhóm lai bỏ ec_point_formats ⇒ EE ngắn hơn đúng 10 B",
-          okC3, f"EncryptedExtensions: X25519 {ee.get('X25519')} B → PQC {ee.get('X25519MLKEM768')} B "
+            and ee["X25519"] - ee["X25519MLKEM768"] == 10
+            and names["X25519"] == ["supported_groups"] and names["X25519MLKEM768"] == [])
+    check("C3", "Giải mã EE bằng keylog: nhóm lai bỏ supported_groups ⇒ EE ngắn hơn đúng 10 B",
+          okC3, f"EncryptedExtensions: X25519 {ee.get('X25519')} B chứa {names['X25519']} → "
+                f"PQC {ee.get('X25519MLKEM768')} B chứa {names['X25519MLKEM768']} "
                 f"(chênh {None if None in ee.values() else ee['X25519']-ee['X25519MLKEM768']} B)")
 except Exception as e:
     check("C3", "Giải mã EncryptedExtensions bằng keylog", None, f"bỏ qua: {e}")
@@ -318,25 +343,41 @@ check("H", "Hoà giải: số flow bắt được = số lần chạy client, m�
       f"lệch = {attempted-captured}")
 
 # ---------------------------------------------------------------- CHECK I: toàn vẹn thiết kế xen kẽ
-# Mỗi cấu hình phải có đúng số flow mỗi nhóm, và hai nhóm phải xen kẽ nhau về thời gian
-# (khoảng cách tới flow khác nhóm gần nhất phải nhỏ hơn nhiều so với nhịp chạy).
-counts_ok = True
-msg_cnt = []
-gaps = []
+# Tiêu chí THEO TỪNG CẤU HÌNH (không dùng trung vị gộp — trung vị gộp bị lệch bởi thành phần
+# delay-0/delay-50 và có thể PASS/FAIL tuỳ dữ liệu bị thiếu), cộng kiểm tra exit_code của client.
+EXPECTED_CFG = {(l, d, m) for l in (0, 1, 3) for d in (0, 50) for m in (1500, 1280)} | {(0, 0, 576)}
+runs_rc = {}
+for f in sorted(glob.glob(os.path.join(LAB, "hs2_*.csv"))):
+    mm = re.search(r"hs2_L(\d+)_D(\d+)_M(\d+)_(X25519|X25519MLKEM768)\.csv$", os.path.basename(f))
+    if mm:
+        d0 = pd.read_csv(f)
+        runs_rc[(int(mm.group(1)), int(mm.group(2)), int(mm.group(3)))] = \
+            runs_rc.get((int(mm.group(1)), int(mm.group(2)), int(mm.group(3))), 0) + int((d0.exit_code != 0).sum())
+cfg_bad, gap_bad, rc_bad_cfg = [], [], []
+gap_txt = []
 for (l, d, m), flows in HS.items():
     nx = sum(1 for v in flows if v["c1"] <= 800); npq = sum(1 for v in flows if v["c1"] > 800)
-    msg_cnt.append(f"L{l}_D{d}_M{m}: {nx}/{npq}")
     if nx != npq:
-        counts_ok = False
+        cfg_bad.append(f"L{l}_D{d}_M{m}({nx}/{npq})")
+    if runs_rc.get((l, d, m), 0) > 0:
+        rc_bad_cfg.append(f"L{l}_D{d}_M{m}")
     tx = np.array([v["t0"] for v in flows if v["c1"] <= 800])
     tp = np.array([v["t0"] for v in flows if v["c1"] > 800])
     if len(tx) and len(tp):
-        for t in tp:
-            gaps.append(float(np.min(np.abs(tx - t))))
-check("I", "Toàn vẹn thiết kế xen kẽ: hai nhóm cân bằng và xen kẽ trong từng cấu hình",
-      (counts_ok and (np.median(gaps) < 0.3)) if gaps else None,
-      f"số flow X/PQC mỗi cấu hình: {', '.join(msg_cnt[:4])}… | khoảng cách tới flow khác nhóm "
-      f"gần nhất (trung vị) = {np.median(gaps)*1000:.1f} ms" if gaps else "thiếu dữ liệu (không PASS)")
+        gg = float(np.median([np.min(np.abs(tx - t)) for t in tp]))
+        gap_txt.append(f"L{l}_D{d}_M{m}={gg*1000:.0f}ms")
+        # ngưỡng theo từng cấu hình: delay 50 ms làm khoảng cách cặp tăng ~0,2 s
+        if gg > (0.3 if d == 0 else 1.0):
+            gap_bad.append(f"L{l}_D{d}_M{m}({gg*1000:.0f}ms)")
+missing_cfg = sorted(EXPECTED_CFG - set(HS.keys()))
+okI = None
+if HS:
+    okI = (not cfg_bad) and (not gap_bad) and (not rc_bad_cfg) and (not missing_cfg)
+check("I", "Toàn vẹn thiết kế xen kẽ THEO TỪNG CẤU HÌNH: đủ 13 cấu hình, hai nhóm cân bằng, mọi lần chạy rc=0, xen kẽ",
+      okI,
+      f"thiếu cấu hình: {missing_cfg or 'không'} | lệch số flow: {cfg_bad or 'không'} | "
+      f"cấu hình có rc≠0: {rc_bad_cfg or 'không'} | khoảng cách cặp vượt ngưỡng: {gap_bad or 'không'} | "
+      f"khoảng cách cặp (trung vị mỗi cấu hình): {', '.join(gap_txt[:5])}…")
 
 # ---------------------------------------------------------------- CHECK J: phân mảnh cấp wire
 # Bản v1 đọc thẳng bảng công bố (tables/rq1_flows.csv) → không độc lập. Bản này tính LẠI từ pcap:
@@ -352,13 +393,19 @@ def wire_segments(pcap):
     legs = []
     for st, ps in by.items():
         ps = sorted(ps, key=lambda q: q["t"])
-        legs.append(dict(g=ps, src0=ps[0]["src"], t0=ps[0]["t"]))
+        # seq gói ĐẦU của stream = SYN: số tuyệt đối (tcp.seq_raw), giữ nguyên qua DNAT
+        legs.append(dict(g=ps, src0=ps[0]["src"], t0=ps[0]["t"], syn_seq=float(ps[0].get("seq") or 0)))
     res = []
     for L in legs:
         if not L["src0"].startswith("172.30.10.3"):
             continue                                    # chỉ xuất phát từ leg pre-NAT (client)
-        M = next((m for m in legs if m is not L and m["src0"].startswith("172.30.20.")
-                  and abs(m["t0"] - L["t0"]) < 0.02), None)
+        def same_leg(m):
+            if not m["src0"].startswith("172.30.20."):
+                return False
+            if not (np.isnan(L["syn_seq"]) or np.isnan(m["syn_seq"])):
+                return L["syn_seq"] == m["syn_seq"]          # khoá chính: seq_raw (giữ qua DNAT)
+            return abs(m["t0"] - L["t0"]) < 0.02             # dự phòng
+        M = next((m for m in legs if m is not L and same_leg(m)), None)
         if M is None:
             continue
         c2s = sorted([p for p in M["g"] if p["src"] == M["src0"] and p["tlen"] > 0], key=lambda q: q["t"])
@@ -401,6 +448,9 @@ if len(JD):
             okJ = False
         if sub.maxpkt.max() > mtu - 52:
             okJ = False
+    if set(JD.mtu.unique()) != {1500, 1280, 576}:
+        okJ = False
+        msg.append(f"THIẾU MTU: chỉ có {sorted(JD.mtu.unique())}")
 check("J", "Phân mảnh cấp wire tính LẠI từ pcap; MTU thực sự có hiệu lực trên leg egress", okJ,
       " | ".join(msg) if msg else "không dựng được từ pcap")
 
@@ -445,18 +495,34 @@ def pmtud_mechanism(cid):
 
 m2 = pmtud_mechanism("c2_hyb_1280_allow")
 m1 = pmtud_mechanism("c1_hyb_1280_drop")
+m8 = pmtud_mechanism("c8_hyb_576_drop")
+m9 = pmtud_mechanism("c9_x25519_576_drop")
+
+def srv_to_client(cid):
+    """Dữ liệu server→client có tới được client không (leg egress pre-NAT)."""
+    f = os.path.join(LAB, f"pcap_pmtud_{cid}.pcapng")
+    return len(ts_fields(f, "ip.src==172.30.10.2 && tcp.len>0", ["tcp.len"])) if os.path.exists(f) else None
+
 okK2 = None
-if m1 and m2:
+if m1 and m2 and m8 and m9:
+    # c2 (cho qua): có ICMP và client TỰ CHIA LẠI ClientHello (egress có đoạn ≤ MSS 1228)
+    # c1 (chặn):   0 ICMP, gửi lại nguyên 1393 B, không gì tới server  → blackhole PMTUD
+    # c8 (hybrid@576): cùng dấu hiệu như c1 ⇒ cũng là blackhole PMTUD
+    # c9 (X25519@576): 0 ICMP nhưng hỏng vì CHIỀU SERVER→CLIENT bị bỏ im lặng trước router
     okK2 = (m2["icmp"] >= 1 and m1["icmp"] == 0
             and 1393 in m2["big"] and len([x for x in m2["egr"] if x > 0]) >= 2
             and max(m2["egr"] or [0]) <= 1228
-            and m1["big"] == [1393] and m1["retr"] >= 5 and not m1["egr"])
-    check("K2", "Cơ chế PMTUD trong pcap: ICMP ⇒ client tự chia lại ClientHello; chặn ICMP ⇒ gửi lại nguyên cỡ",
+            and m1["big"] == [1393] and m1["retr"] >= 5 and not m1["egr"]
+            and m8["icmp"] == 0 and m8["big"] == [1393] and m8["retr"] >= 5 and not m8["egr"]
+            and m9["icmp"] == 0 and (srv_to_client("c9_x25519_576_drop") == 0))
+    check("K2", "Cơ chế trong pcap: ICMP ⇒ tự chia lại CH; chặn ICMP ⇒ blackhole (c1, c8); c9 = drop im lặng chiều server→client",
           okK2,
-          f"ô CHO QUA: {m2['icmp']} ICMP, egress nhận các đoạn {m2['egr']} (≤ MSS 1228), ingress gửi {m2['big']} | "
-          f"ô CHẶN: {m1['icmp']} ICMP, ingress chỉ có {m1['big']} gửi lại {m1['retr']} lần, egress không có dữ liệu")
+          f"c2 (cho qua): {m2['icmp']} ICMP, egress nhận {m2['egr']} (≤ MSS 1228), ingress gửi {m2['big']} | "
+          f"c1 (chặn): {m1['icmp']} ICMP, gửi lại {m1['retr']} lần nguyên {m1['big']}, egress rỗng | "
+          f"c8 (hybrid@576): {m8['icmp']} ICMP, gửi lại {m8['retr']} lần nguyên {m8['big']}, egress rỗng | "
+          f"c9 (X25519@576): {m9['icmp']} ICMP, gói server→client tới được client = {srv_to_client('c9_x25519_576_drop')}")
 else:
-    check("K2", "Cơ chế PMTUD trong pcap", None, "thiếu pcap c1/c2")
+    check("K2", "Cơ chế PMTUD trong pcap", None, "thiếu pcap c1/c2/c8/c9")
 
 # ---------------------------------------------------------------- CHECK L: đối chứng thứ tự
 oc = os.path.join(BASE, "tables", "order_control.json")

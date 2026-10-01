@@ -19,10 +19,10 @@ thử PMTUD có kiểm soát**, và tái lập được 100% bằng script trong
 | # | Phát hiện | Số liệu |
 |---|---|---|
 | 1 | Chi phí byte khớp **FIPS 203 đến từng byte**, không phải "xấp xỉ" | ClientHello mang key_share **1216 B** = encapsulation key **1184 B** + X25519 32 B; ServerHello mang **1120 B** = ciphertext **1088 B** + X25519 32 B |
-| 2 | Chênh lệch *tổng* nhỏ hơn các con số trên vì nhóm lai bỏ một extension | ΔClientHello **+1176 B** (1184 − 8 do bỏ `ec_point_formats`); Δflight server **+1076…1078 B** (1088 − 10 ± dao động chữ ký ECDSA) |
+| 2 | Chênh lệch *tổng* nhỏ hơn các con số trên vì nhóm lai bỏ extension ở mỗi phía | ΔClientHello **+1176 B** (1184 − 8 do bỏ `ec_point_formats`); Δflight server **+1075…1080 B** (1088 − 10 do bỏ `supported_groups` ở EncryptedExtensions) |
 | 3 | **Phân mảnh cấp wire** đo được (sau khi tắt GSO/TSO) | Flight client: **1→2** segment ở MTU 1280, **1→3** ở MTU 576. Flight server: **1→2** ở 1500, **1→2** ở 1280, **2→4** ở 576 |
 | 4 | **RTT bắt tay tăng có ý nghĩa** — bản v1 bỏ sót do kiểm định sai thiết kế | Hybrid chậm hơn **0,17–0,44 ms** (**+14–17%** khi RTT nền ~1,2 ms; **<0,5%** khi RTT nền ~100 ms); hướng hiệu ứng nhất quán **11/13** cấu hình (sign test một phía p = 0,011), **có ý nghĩa sau Holm ở 4/13**. Đối chứng **đảo thứ tự ngẫu nhiên** (n = 60 cặp/nhóm) xác nhận **+0,33…0,36 ms, Cliff's δ ≈ 0,85–0,90, p ≈ 10⁻¹⁷**, và hiệu ứng *vị trí* không đáng kể (p = 0,14/0,45) |
-| 5 | **PMTUD blackhole tái hiện có kiểm soát** (đóng góp mới, chưa có tiền lệ) | Hybrid + PMTU 1280 + không clamp + ICMP frag-needed bị lọc: **0/6 hoàn tất** (timeout 8 s); X25519 cùng điều kiện: **6/6**. Chỉ cần cho ICMP qua / bật clamp / MTU 1500 → **6/6** |
+| 5 | **PMTUD blackhole tái hiện có kiểm soát** (đóng góp mới; hiện tượng PMTUD nói chung đã được nghiên cứu từ lâu — xem RFC 2923/8899, Luckie & Stasiewicz IMC 2012) | Hybrid + PMTU 1280 + không clamp + ICMP frag-needed bị lọc: **0/6 hoàn tất** (timeout 8 s); X25519 cùng điều kiện: **6/6**. Chỉ cần cho ICMP qua / bật clamp / MTU 1500 → **6/6** |
 | 6 | Bằng chứng nhân quả cho #5 | Capture ghi **6 gói ICMP type 3 code 4** ở nhánh "cho qua", **0** ở nhánh "chặn" |
 | 7 | Rủi ro thuộc về *kích thước vượt PMTU*, không phải PQC | Ở PMTU 576, **X25519 cũng hỏng** (0/6) — nhưng cơ chế là **drop im lặng ở chặng veth/bridge** (0 gói ICMP trong capture), không phải blackhole PMTUD |
 | 8 | Độ tin cậy không suy giảm khi xử lý MTU đúng | **780/780** lần chạy client `rc=0`; **780/780** flow bắt được và phân tích được |
@@ -88,6 +88,7 @@ bash run_matrix2.sh                  # 13 cấu hình × 30 cặp XEN KẼ + 2 d
 bash run_pmtud.sh                    # thí nghiệm PMTUD có kiểm soát (~10 phút)
 bash run_ch_budget.sh                # capture snaplen đầy đủ cho ngân sách byte (~1 phút)
 N_HS=60 bash run_order_control.sh    # đối chứng ĐẢO THỨ TỰ ngẫu nhiên, n=60 cặp/nhóm (~6 phút)
+bash run_pmtud_threshold.sh          # QUÉT NGƯỠNG PMTU hai chiều, 3 lần thử/ô (~6 phút)
 
 cd ../04-thiet-ke-nghien-cuu/analysis
 bash extract_metrics.sh              # pcap2_* → packets_all.tsv
@@ -96,7 +97,8 @@ python rq23_analysis.py              # drift, thích ứng, ranh giới họ đ�
 python rq2b_group_classifier.py      # quan sát tối thiểu để nhận diện nhóm KEM
 python order_control.py              # tách bạch hiệu ứng NHÓM vs hiệu ứng VỊ TRÍ
 python audit_kiemdinh.py             # 15 hạng mục kiểm định chéo độc lập
-python check_report_numbers.py       # đối chiếu MỌI con số trong báo cáo với dữ liệu thô
+python pmtud_threshold.py            # ngưỡng PMTU đo được, tách bạch hai chiều
+python check_report_numbers.py       # đối chiếu 199 mục trong báo cáo với dữ liệu thô
 python md2pdf_report.py              # (tuỳ chọn) sinh lại PDF
 ```
 

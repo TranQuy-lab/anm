@@ -68,7 +68,7 @@
 5. `order_control.py` → tách bạch hiệu ứng **nhóm** và hiệu ứng **vị trí** trong cặp
    (phòng ngừa confound: ma trận chính luôn cho X25519 chạy trước)
 6. `check_ch_budget.py` → đối chiếu key_share với FIPS 203
-7. `audit_kiemdinh.py` → 13 hạng mục kiểm định chéo độc lập
+7. `audit_kiemdinh.py` → **15** hạng mục kiểm định chéo độc lập (+ `check_report_numbers.py`, `pmtud_threshold.py`)
 8. `md2pdf_report.py` → PDF
 
 ## 6. Sai khác so với kế hoạch v1 (ghi trung thực)

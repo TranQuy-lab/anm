@@ -28,7 +28,7 @@ RNG = np.random.default_rng(20261002)
 
 def load_packets(path):
     df = pd.read_csv(path, sep="\t", header=None, skiprows=1)
-    df.columns = ["pcap","stream","time","src","dst","tcplen","seq","ack","retrans","syn","fin","rst"]
+    df.columns = ["pcap","stream","time","src","dst","tcplen","seq","ack","retrans","syn","fin","rst","seqraw"]
     for c in ("retrans","syn","fin","rst"):
         df[c] = pd.to_numeric(df[c].replace({"True":1,"False":0,"true":1,"false":0}), errors="coerce") \
                   .fillna(0).astype(int)
@@ -156,6 +156,7 @@ def main():
             "within1280_all": ev(trB, teB, feats_all),
             "within1280_app_totals": ev(trB, teB, APP_TOTAL),
             "within1280_app_seq": ev(trB, teB, APP_SEQ),
+            "within1280_handshake": ev(trB, teB, HS_FEAT),
         }
         # (3) THÍCH ỨNG: thêm k flow MTU 1280 / lớp vào tập train
         curve = []

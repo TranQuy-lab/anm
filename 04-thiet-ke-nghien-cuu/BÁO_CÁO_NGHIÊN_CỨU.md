@@ -22,7 +22,7 @@ Bốn kết quả chính:
    capture snaplen đầy đủ: ClientHello mang **1216 B** = encapsulation key ML-KEM-768
    **1184 B** (FIPS 203) + X25519 32 B; ServerHello mang **1120 B** = ciphertext **1088 B**
    + X25519 32 B. Chênh lệch *tổng* nhỏ hơn các con số này (+1176 và +1076…1078) vì nhóm lai
-   **bỏ extension `ec_point_formats`** ở cả ClientHello (−8 B) và EncryptedExtensions (−10 B).
+   **bỏ một extension ở mỗi phía**: `ec_point_formats` khỏi ClientHello (−8 B) và `supported_groups` khỏi EncryptedExtensions (−10 B).
    Đây là kiểm chứng cơ chế, thay cho tuyên bố "khớp 0.0%" tự quy chiếu của bản v1.
 
 2. **Phân mảnh cấp wire đo được, không còn suy diễn.** Sau khi tắt GSO/TSO trên NIC ảo
@@ -53,8 +53,9 @@ Bốn kết quả chính:
 **Về khả năng nhận dạng lưu lượng:** chúng tôi **không** tuyên bố tính mới — quan sát thụ động
 phân biệt cổ điển/hậu lượng tử đã được công bố (arXiv:2503.17830; ePrint 2026/834;
 arXiv:2608.22683). Đóng góp ở đây là **đo ranh giới**: nhóm KEM đạt **accuracy 1,00** chỉ với
-họ đặc trưng *chạm vào bắt tay*, và tụt về **0,58–0,59** — **yếu nhưng vẫn trên mức ngẫu nhiên 0,5** (170/288, p = 0,0026 cho
-đặc trưng tổng; 167/288, p = 0,0079 cho chuỗi gói) — khi chỉ dùng đặc trưng pha ứng dụng thuần. Fixture 6 site của chúng tôi **tầm thường** (1-NN một đặc trưng = 1,000) và
+họ đặc trưng *chạm vào bắt tay*, và tụt về **0,58–0,59** (mức ngẫu nhiên 0,5) khi chỉ dùng đặc trưng pha ứng dụng thuần. Vì các
+flow trong cùng một site gần như trùng nhau, chúng tôi **không gán p-value** cho chênh lệch này —
+đó là mô tả định lượng, không phải một kiểm định độc lập. Fixture 6 site của chúng tôi **tầm thường** (1-NN một đặc trưng = 1,000) và
 điều này được báo cáo như một phép kiểm bắt buộc, không giấu.
 
 ---
@@ -87,8 +88,12 @@ NIST IR 8547 vẫn là **bản nháp** (Initial Public Draft, 11/2024) — khôn
 
 ### 1.3 Khoảng trống thật sự và câu hỏi nghiên cứu
 
-Sau khi loại các tuyên bố đã bị chiếm, khoảng trống còn lại — và chúng tôi tìm nhiều truy vấn
-khác nhau mà **không** thấy công trình nào làm — là:
+Cần nói rõ: **hiện tượng PMTUD blackhole do lọc ICMP đã được nghiên cứu kỹ trong mạng nói
+chung từ lâu** (RFC 2923 *TCP Problems with Path MTU Discovery*; RFC 8899 PLPMTUD; Luckie &
+Stasiewicz, *Measuring Path MTU Discovery Behaviour*, IMC 2012). Cái **chưa** được đo là hệ quả
+của nó **đối với bắt tay hậu lượng tử** — tức khi kích thước thông điệp vượt PMTU trở thành
+chuyện thường ngày thay vì ngoại lệ. Sau khi loại các tuyên bố đã bị chiếm, khoảng trống còn lại
+— và chúng tôi tìm nhiều truy vấn khác nhau mà **không** thấy công trình nào làm — là:
 
 - **G1.** Khi bắt tay PQC vượt PMTU và **ICMP "fragmentation needed" bị lọc**, chuyện gì xảy
   ra? Đây là cấu hình phổ biến (firewall doanh nghiệp, middlebox, NAT) nhưng chưa được đo.
@@ -204,10 +209,11 @@ Chênh lệch *tổng* lại nhỏ hơn hai con số này, và phần hụt đư
 
 - **ΔClientHello = +1176 B = 1184 − 8**: nhóm lai **bỏ extension `ec_point_formats`**
   (4 B payload + 4 B header) mà ClientHello X25519 có.
-- **Δflight server = +1076…1078 B ≈ 1088 − 10**: nhóm lai bỏ `ec_point_formats` trong
-  EncryptedExtensions. Phần này **đã được kiểm chứng độc lập bằng giải mã**: dùng keylog khớp
-  pcap, EncryptedExtensions đo được **12 B (X25519) → 2 B (PQC)**, chênh đúng 10 B (check C3);
-  phần dao động ±2 B còn lại là độ dài chữ ký ECDSA.
+- **Δflight server = +1075…1080 B ≈ 1088 − 10**: nhóm lai bỏ extension **`supported_groups`**
+  trong EncryptedExtensions. Kiểm chứng độc lập bằng **giải mã**: EncryptedExtensions của X25519
+  dài 12 B và chứa **đúng một** extension `supported_groups` (4 B header + 6 B dữ liệu), còn của
+  nhóm lai dài 2 B và **không có extension nào** ⇒ chênh đúng 10 B (check C3). Dao động còn lại
+  (Δ ∈ [1075, 1080] B) là **độ trải** của độ dài chữ ký ECDSA, mỗi phía ±1 B.
 
 Bản v1 công bố "khớp lý thuyết với sai lệch 0,0%" bằng cách so Δclient với **chính giá trị
 đo được** (1176) và gán sai vai trò của ciphertext/encapsulation key. Bản v2 thay bằng phép
@@ -266,7 +272,7 @@ có thật, và không phải là một vòng RTT thêm**.
 được hiệu chỉnh Holm trong **một họ duy nhất** (khắt khe hơn nhiều so với Holm theo từng họ metric).
 Khi đó vẫn còn **78/150 test có ý nghĩa**, trong đó có chính các so sánh RTT: `hs_rtt` ở
 L0_D0_M576 (`p_holm_global` = 0,033), L0_D0_M1500 (0,041), L3_D50_M1280 (0,00085), và metric
-phân rã `rtt_ch_to_sv1` ở ba cấu hình (0,00012 / 0,0043 / 0,00005). Kết luận về RTT không phụ
+phân rã `rtt_ch_to_sv1` ở **bốn** cấu hình (0,00012 / 0,0043 / 0,00005 / 0,0271). Kết luận về RTT không phụ
 thuộc cách định nghĩa họ hiệu chỉnh.
 
 Phân rã RTT (mạng sạch) định vị chi phí:
@@ -340,15 +346,32 @@ chỉ nên so sánh **trong cùng một lần chạy**.
 | c8 | hybrid | **576** | off | chặn | **0/6** | 8,56 s | 0 |
 | c9 | X25519 | **576** | off | chặn | **0/6** | 8,59 s | 0 |
 
+**Bảng 5 — Ngưỡng PMTU an toàn, ĐO trực tiếp** (`run_pmtud_threshold.sh`, CLAMP=off, ICMP chặn,
+MTU_A=1500; 3 lần thử mỗi ô, mỗi ô có pcap riêng để kiểm cả hai chiều):
+
+| MTU_B | X25519: CH qua? | X25519 hoàn tất | Hybrid: CH qua? | Hybrid hoàn tất |
+|---|---|---|---|---|
+| 900 | ✓ (217 B) | 3/3 | ✗ (0 byte tới server) | **0/3** |
+| 1200 | ✓ | 3/3 | ✗ | **0/3** |
+| 1400 | ✓ | 3/3 | ✗ | **0/3** |
+| 1440 | ✓ | 3/3 | ✗ | **0/3** |
+| **1448** | ✓ | 3/3 | **✓ (một segment 1393 B)** | **3/3** |
+
+Ngưỡng **đo được**: hybrid cần **PMTU ≥ 1445 B** (1393 B ClientHello + 20 B IP + 32 B TCP có
+timestamp); X25519 sống ở mọi mức quét từ 900 B trở lên (gói lớn nhất phía client là 269 B).
+Ở ô 1448, ClientHello qua trong **đúng một** segment và **không cần ICMP** (0 gói) — đúng biên;
+hướng server→client không phải nút thắt ở mức này (server gửi flight 1846 B, router cắt theo
+MTU_A=1500 ở leg egress).
+
 **Cơ chế, nhìn trực tiếp trong pcap** (đây là phần bản v1 hoàn toàn thiếu):
 
 - Ô **c2** (ICMP cho qua): client gửi ClientHello **1393 B trong một segment** (khung 22) →
   router phát **ICMP type 3 code 4** (khung 23) → **37 µs sau**, client gửi lại thành
   **1228 + 165 = 1393 B** (khung 47–48 trên leg egress) → server trả lời → bắt tay hoàn tất
   trong 0,56 s. Tức là ICMP đã được dùng đúng: client học PMTU và **tự chia lại** gói.
-- Ô **c1** (ICMP bị chặn): **0 gói ICMP** trong toàn bộ capture; client gửi lại **nguyên 1393 B
-  bảy lần** với backoff (14,15 → 14,36 → 14,77 → 15,62 → 17,28 → 20,54 → 35,40 s), không lần nào
-  tới được server, rồi timeout 8 s. Đây là blackhole PMTUD đúng nghĩa, có cả dấu vết backoff.
+- Ô **c1** (ICMP bị chặn): **0 gói ICMP** trong toàn bộ capture; client gửi lại **nguyên 1393 B sáu lần** với backoff (14,15 → 14,36 → 14,77 → 15,62 → 17,28 →
+  20,54 s; mốc 35,40 s là lần gửi đầu của **lần thử kế tiếp**), không lần nào tới được server,
+  rồi timeout 8 s. Đây là blackhole PMTUD đúng nghĩa, có cả dấu vết backoff.
 
 Bốn kết luận:
 
@@ -358,14 +381,18 @@ Bốn kết luận:
 2. **Bỏ bất kỳ nhân tố nào là đủ để khôi phục 6/6**: cho ICMP qua (c2), bật MSS clamp (c5),
    hoặc PMTU 1500 (c6).
 3. **X25519 miễn nhiễm ở PMTU 1280** (c3: 6/6) vì mọi thông điệp của nó vừa một packet.
-4. **Ở PMTU 576, X25519 cũng hỏng** (c9: 0/6) — *nhưng cơ chế khác*: ở cột 576, hướng
-   server→client vượt MTU **ngay trên chặng veth/bridge trước router** (capture của c9 có **0 gói
-   ICMP** và 0 gói dữ liệu server→client; server có gửi nhưng bị bỏ im lặng trước điểm capture),
-   nên cột này minh hoạ **drop im lặng theo MTU**, không phải blackhole PMTUD. Các cột c1–c7 và
-   đối chứng thứ tự không bị ảnh hưởng. Điều rút ra vẫn đúng: rủi ro thuộc về **kích thước vượt
-   PMTU**, không phải đặc quyền của PQC. PQC chỉ **dịch ngưỡng an toàn**: X25519 cần PMTU ≳ 820 B
-   (giới hạn bởi flight server 767 B), trong khi hybrid cần PMTU ≳ 1450 B (giới hạn bởi
-   ClientHello 1393 B cộng header IP/TCP/Ethernet) — tức là đưa nhiều đường truyền thực tế
+4. **Ở PMTU 576, cả hai nhóm đều hỏng, nhưng vì hai lý do khác nhau** — và điều này được kiểm
+   tra trực tiếp trong pcap chứ không suy đoán:
+   - **c8 (hybrid, 576)** là **blackhole PMTUD thật**, cùng dấu hiệu như c1: ClientHello 1393 B
+     được gửi đi, **không** xuất hiện ở leg egress (không tới server), client gửi lại nguyên cỡ
+     6 lần/lần thử, **0 gói ICMP**.
+   - **c9 (X25519, 576)** hỏng vì hướng server→client vượt MTU **trước điểm capture**
+     (0 gói ICMP, 0 dữ liệu server→client; server có gửi 767 B nhưng bị bỏ im lặng trên chặng
+     veth/bridge) ⇒ **drop im lặng theo MTU**, không phải PMTUD.
+   Các cột c1–c7 và đối chứng thứ tự không bị ảnh hưởng. Điều rút ra vẫn đúng: rủi ro thuộc về
+   **kích thước vượt PMTU**, không phải đặc quyền của PQC. PQC chỉ **dịch ngưỡng an toàn**: X25519 cần PMTU ≳ 820 B
+   (giới hạn bởi flight server 767 B), trong khi hybrid cần PMTU ≳ 1450 B (giới hạn bởi ClientHello 1393 B
+   cộng 20 B IP và 32 B TCP có timestamp = 1445 B) — tức là đưa nhiều đường truyền thực tế
    (VPN, tunnel, IPv6 tối thiểu 1280) vào vùng nguy hiểm.
 
 Đây là khoảng trống y văn mà chúng tôi tìm nhiều truy vấn khác nhau **không** thấy công trình
@@ -390,7 +417,7 @@ riêng biệt, chia train/test theo thời gian:
 | Chuỗi gói pha ứng dụng thuần | 0,580 |
 
 Tức là: việc chuyển sang PQC **chỉ hiện ra** ở những đặc trưng chạm vào bắt tay; họ đặc trưng
-pha ứng dụng gần như không thấy gì (≈ 0,5 = ngẫu nhiên). Đây là *ranh giới* mà bản v1 phát biểu
+pha ứng dụng chỉ đạt 0,58–0,59 so với mức ngẫu nhiên 0,5 (mô tả định lượng; không gán p-value vì các flow trong cùng site gần như trùng nhau). Đây là *ranh giới* mà bản v1 phát biểu
 định tính; bản v2 định lượng nó.
 
 **Drift do đổi MTU (kết quả âm, báo cáo thẳng).** Train ở MTU 1500 → test ở MTU 1280:
@@ -400,7 +427,7 @@ pha ứng dụng gần như không thấy gì (≈ 0,5 = ngẫu nhiên). Đây l
 | Tất cả | 1,000 | 1,000 |
 | Tổng byte / tổng pha ứng dụng | 1,000 | 1,000 |
 | Chuỗi gói pha ứng dụng | 0,493 | 0,500 |
-| Bắt tay thuần | 0,188 (so với 1/6, p = 0,28 — *không* phải drift) | 0,160 (≈ mức ngẫu nhiên 1/6) |
+| Bắt tay thuần | 0,167 (≈ mức ngẫu nhiên 1/6 ⇒ không phải drift) | 0,160 (≈ mức ngẫu nhiên 1/6) |
 
 Không có drift: họ chuỗi gói vốn đã yếu (0,49 ngay trong cùng MTU), còn họ tổng byte thì bất
 biến với MTU. **RQ3 (chi phí thích ứng) do đó không kiểm chứng được với fixture này** — mọi
@@ -449,9 +476,9 @@ Kết quả audit tự động (`analysis/audit_kiemdinh.py`, output `tables/aud
 |---|---|---|
 | A | Tái xuất độc lập bằng tshark JSON (khác hoàn toàn code chính) | **PASS** — 297/767 (X25519) và 1473/1845 (PQC), khớp bảng công bố |
 | B | Placebo: chia đôi ngẫu nhiên **cùng nhóm**, 200 lần | **PASS** — tỉ lệ dương tính giả 0,080 |
-| C | Đối chiếu FIPS 203 với hằng số **độc lập** (ek 1184 / ct 1088) | **PASS** — Δ +1176 = 1184−8; Δ server +1078 = 1088−10 |
+| C | Đối chiếu FIPS 203 với hằng số **độc lập** (ek 1184 / ct 1088) | **PASS** — Δ +1176 = 1184 − 8 (`ec_point_formats` ở CH); Δ server ≈ 1088 − 10 (`supported_groups` ở EE) |
 | C2 | Bóc key_share từ capture snaplen đầy đủ | **PASS** — 1216 = 1184+32 và 1120 = 1088+32 B |
-| C3 | **Giải mã EncryptedExtensions bằng keylog** | **PASS** — EE 12 B (X25519) → 2 B (PQC), chênh **đúng 10 B** |
+| C3 | **Giải mã EncryptedExtensions bằng keylog** và đọc tên extension bị bỏ | **PASS** — EE 12 B chứa `supported_groups` → 2 B (rỗng), chênh **đúng 10 B** |
 | D | Fingerprint **không dùng nhãn**: luật ngưỡng 800 B đối chiếu với nhãn nhóm đọc từ **CSV lần chạy** | **PASS** — accuracy 1,0000 trên 360 flow; packet đầu client chỉ nhận hai giá trị 217 và 1393 |
 | E | Đặc trưng bắt tay thuần cho 6 lớp site, kiểm nhị thức với 1/6 | **PASS** — accuracy 0,188, p = 0,28 ⇒ không có tín hiệu site |
 | F | Hoán vị nhãn nhóm (hủy tín hiệu thật), 300 lần | **PASS** — tỉ lệ p<0,05 là 0,063 ≈ 5% |
@@ -460,7 +487,7 @@ Kết quả audit tự động (`analysis/audit_kiemdinh.py`, output `tables/aud
 | I | Toàn vẹn thiết kế xen kẽ: hai nhóm cân bằng, xen kẽ | **PASS** — 30/30 mỗi cấu hình; lệch SYN trong cặp ~165 ms |
 | J | Phân mảnh cấp wire **tính lại từ pcap**; MTU có hiệu lực thật trên leg egress | **PASS** — client 1→1/1→2/1→3 và server 1→2/1→2/2→4 segment ở MTU 1500/1280/576; gói egress lớn nhất = MTU−52 |
 | K | PMTUD blackhole có kiểm soát | **PASS** — c1 0/6, c2–c7 6/6, c8 và c9 0/6 |
-| K2 | **Cơ chế PMTUD trong pcap**: ICMP ⇒ client tự chia lại ClientHello; chặn ICMP ⇒ gửi lại nguyên cỡ rồi treo | **PASS** — ô cho qua: 6 ICMP, egress nhận 1228+165 (≤ MSS); ô chặn: 0 ICMP, gửi lại nguyên 1393 B **36 lần**, egress không có dữ liệu |
+| K2 | **Cơ chế trong pcap** cho cả bốn ô: cho qua / chặn / c8 (hybrid@576) / c9 (X25519@576) | **PASS** — c2: 6 ICMP và CH được chia lại 1228+165; c1 **và c8**: 0 ICMP, gửi lại nguyên 1393 B 36 lần, egress rỗng; c9: 0 ICMP, 0 gói server→client tới được client |
 | L | Đối chứng thứ tự ngẫu nhiên: hiệu ứng nhóm tái lập; hiệu ứng vị trí **trong từng nhóm** nhỏ | **PASS** — Δnhóm +0,358/+0,331 ms (p ≈ 10⁻¹⁷); Δvị trí trong nhóm chỉ +0,012/−0,045 và +0,061/+0,066 ms |
 
 Ba hạng mục của bản v1 đã được **sửa vì chúng tự tham chiếu hoặc vô hiệu**:
@@ -497,7 +524,7 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 
 - **Byte là chi phí thật và được giải thích trọn vẹn**: +1184 B encapsulation key ở chiều
   client, +1088 B ciphertext ở chiều server, khớp FIPS 203; phần hụt so với tổng quan sát được
-  là do extension `ec_point_formats` bị bỏ ở nhóm lai.
+  là do nhóm lai bỏ `ec_point_formats` (ClientHello) và `supported_groups` (EncryptedExtensions).
 - **Hệ quả vận hành thật nằm ở PMTUD, không ở băng thông**: khi PMTU nhỏ hơn bắt tay và ICMP
   frag-needed bị lọc, bắt tay hybrid **treo hoàn toàn** trong khi X25519 vẫn chạy; bật MSS
   clamp hoặc cho ICMP qua là đủ để khắc phục. Khuyến nghị vận hành cụ thể: **clamp MSS tại
@@ -541,6 +568,9 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
     Traffic Classifiers*, IEEE S&P 2025 (arXiv:2503.20093).
 16. Kassis, Agarwal, He, Patel, Brueckner, *Scientific Agent Skills: A Library of Procedural
     Knowledge for Research Agents*, arXiv:2609.00065, 2026.
+17. IETF, **RFC 2923** *TCP Problems with Path MTU Discovery*, Informational, 2000.
+18. IETF, **RFC 8899** *Packetization Layer Path MTU Discovery for Datagram Transports*, 2020.
+19. Luckie & Stasiewicz, *Measuring Path MTU Discovery Behaviour*, ACM IMC 2012.
 
 ---
 
@@ -554,7 +584,8 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 | Trích xuất per-packet | `analysis/packets_all.tsv` (≈402 nghìn dòng) |
 | Phân tích | `analysis/rq1_analysis.py`, `rq23_analysis.py`, `rq2b_group_classifier.py`, `order_control.py`, `check_ch_budget.py` |
 | Kiểm định chéo | `analysis/audit_kiemdinh.py` → `tables/audit_results.csv` |
-| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (98 mục, thoát mã 1 nếu lệch) |
+| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (**199 mục**: Bảng 1–5, phân rã RTT, đối chứng thứ tự, bảng audit, số trong văn xuôi; thoát mã 1 nếu lệch) |
+| Ngưỡng PMTU đo được | `docker-lab/run_pmtud_threshold.sh` → `analysis/pmtud_threshold.py`, `tables/pmtud_threshold.json` |
 | Hồ sơ kiểm chứng | `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md` |
 | Sinh PDF | `analysis/md2pdf_report.py` |
 
