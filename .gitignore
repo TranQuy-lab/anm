@@ -1,0 +1,4 @@
+# Dữ liệu thô tái tạo bằng docker-lab/run_matrix.sh; bản gốc lưu trong commit 7717a72
+docker-lab/results/pcap_*.pcapng
+docker-lab/results/sniff*.txt
+04-thiet-ke-nghien-cuu/analysis/packets_all.tsv
