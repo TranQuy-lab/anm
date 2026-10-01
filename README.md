@@ -100,7 +100,7 @@ python rq2b_group_classifier.py      # quan sát tối thiểu để nhận di�
 python order_control.py              # tách bạch hiệu ứng NHÓM vs hiệu ứng VỊ TRÍ
 python audit_kiemdinh.py             # 15 hạng mục kiểm định chéo độc lập
 python pmtud_threshold.py            # ngưỡng PMTU đo được, tách bạch hai chiều
-python check_report_numbers.py       # đối chiếu 279 mục trong báo cáo với dữ liệu thô
+python check_report_numbers.py       # đối chiếu 286 mục trong báo cáo với dữ liệu thô
 python md2pdf_report.py              # (tuỳ chọn) sinh lại PDF
 ```
 

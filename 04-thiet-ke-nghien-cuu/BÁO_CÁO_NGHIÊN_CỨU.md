@@ -456,7 +456,13 @@ riêng biệt, chia train/test theo thời gian:
 | Chuỗi gói pha ứng dụng thuần | 0,580 |
 
 Tức là: việc chuyển sang PQC **chỉ hiện ra** ở những đặc trưng chạm vào bắt tay; họ đặc trưng
-pha ứng dụng chỉ đạt 0,58–0,59 so với mức ngẫu nhiên 0,5 (mô tả định lượng; không gán p-value vì các flow trong cùng site gần như trùng nhau). Đây là *ranh giới* mà bản v1 phát biểu
+pha ứng dụng chỉ đạt 0,58–0,59 so với mức ngẫu nhiên 0,5 (mô tả định lượng; không gán p-value vì các flow trong cùng site gần như trùng nhau).
+
+**Mức quan sát tối thiểu phụ thuộc MTU.** Một luật ngưỡng đơn giản trên **packet đầu tiên của
+client** (ngưỡng 800 B, đọc ở leg egress) đạt 1,000 ở MTU 1500 và 1280, nhưng **chỉ 0,5 ở MTU 576**
+— vì ClientHello bị cắt và mảnh đầu chỉ còn 524 B. Trong khi đó, luật trên **tổng byte flight
+client** (297 B so với 1473 B) đạt **1,000 ở mọi MTU**. Tức là khi bắt tay vượt một packet, quan
+sát viên phải dùng **tổng byte của flow**, không phải kích thước một packet. Đây là *ranh giới* mà bản v1 phát biểu
 định tính; bản v2 định lượng nó.
 
 **Drift do đổi MTU (kết quả âm, báo cáo thẳng).** Train ở MTU 1500 → test ở MTU 1280:
@@ -643,7 +649,7 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 | Trích xuất per-packet | `analysis/packets_all.tsv` (≈402 nghìn dòng) |
 | Phân tích | `analysis/rq1_analysis.py`, `rq23_analysis.py`, `rq2b_group_classifier.py`, `order_control.py`, `check_ch_budget.py` |
 | Kiểm định chéo | `analysis/audit_kiemdinh.py` → `tables/audit_results.csv` |
-| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (**279 mục**: Bảng 1–5, phân rã RTT, đối chứng thứ tự, bảng audit, số trong văn xuôi; thoát mã 1 nếu lệch) |
+| Đối chiếu số liệu báo cáo ↔ dữ liệu thô | `analysis/check_report_numbers.py` (**286 mục**: Bảng 1–5, phân rã RTT, đối chứng thứ tự, bảng audit, số trong văn xuôi; thoát mã 1 nếu lệch) |
 | Ngưỡng PMTU đo được | `docker-lab/run_pmtud_threshold.sh` → `analysis/pmtud_threshold.py`, `tables/pmtud_threshold.json` |
 | Hồ sơ kiểm chứng | `07-kiem-chung-doc-lap/KIEM_CHUNG_DOC_LAP.md` |
 | Sinh PDF | `analysis/md2pdf_report.py` |

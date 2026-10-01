@@ -312,6 +312,18 @@ def main():
         for tok in re.findall(r"\d{2,}", cell):
             chk(tok in int_pool[cid], f"Bảng audit {cid}: số nguyên '{tok}' không có trong audit_results.csv")
 
+    # ---------- quan sát tối thiểu theo MTU ← rq2b_summary.json ----------
+    R2 = json.load(open(os.path.join(BASE, "tables", "rq2b_summary.json")))
+    for mtu, exp_eg, exp_fl in ((576, 0.5, 1.0), (1280, 1.0, 1.0), (1500, 1.0, 1.0)):
+        r = R2["by_mtu"].get(str(mtu)) or R2["by_mtu"].get(mtu)
+        if r is None:
+            errs.append(f"rq2b: thiếu MTU {mtu}"); n += 1; continue
+        chk(same(exp_eg, r["threshold_800_egress_first_pkt_acc"], 1),
+            f"rq2b MTU {mtu}: accuracy packet đầu = {r['threshold_800_egress_first_pkt_acc']:.3f}, báo cáo nói {exp_eg}")
+        chk(same(exp_fl, r["threshold_800_client_flight_acc"], 1),
+            f"rq2b MTU {mtu}: accuracy tổng byte = {r['threshold_800_client_flight_acc']:.3f}, báo cáo nói {exp_fl}")
+    chk("0,5 ở MTU 576" in s or "chỉ 0,5 ở MTU 576" in s, "Thiếu câu về accuracy 0,5 ở MTU 576")
+
     # ---------- số trong văn xuôi ----------
     prose = [
         ("0,17–0,44 ms", "khoảng Δ RTT", r"0,17–0,44 ms"),
