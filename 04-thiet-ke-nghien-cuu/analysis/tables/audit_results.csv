@@ -1,0 +1,10 @@
+CHECK,Tên,Kết luận,Chi tiết
+A,Tái xuất độc lập (json + time-gap clustering) khớp số công bố,PASS,"đo lại (cli=CH+flight2): X25519 297/768 | MLKEM 1473/1846 — công bố 297/768, 1473/1846 | CH thuần: 217 → 1393 (tỉ lệ 6.42×)"
+B,"Placebo: chia đôi ngẫu nhiên CÙNG nhóm (L3_D50_M1280), 200 lần → p<0.05 ≈ 5%",PASS,tỷ lệ = 0.000
+C,Chênh lệch byte khớp lý thuyết ML-KEM-768 (ct 1088 B / pubkey 1184 B),PASS,"client +1176B (lý thuyết ≈1176, lệch 0.0%) | server +1078B (lý thuyết ≈1152, lệch 6.4%)"
+D,Fingerprint mù: ngưỡng 800B tách hai nhóm không cần nhãn,PASS,accuracy = 1.0000 (177+176 flows)
+E,Cơ chế kháng drift: CHỈ đặc trưng handshake → ~ngẫu nhiên (6 lớp ≈ 0.17),PASS,accuracy = 0.238 — tín hiệu phân biệt site nằm ở pha ứng dụng
+F,Hoán vị nhãn nhóm (hủy tín hiệu thật) → p<0.05 ≈ 5%,PASS,tỷ lệ = 0.043 / 300 lần
+G,Tính lại Wilcoxon + Holm (13 cấu hình) khớp bảng công bố,PASS,tính lại: [0.1574 0.3519 1.     1.     1.    ]… | công bố: [0.1574 0.3519 1.     1.     1.    ]…
+H,Toàn vẹn: số flow/cấu hình khớp bảng rq1_flows đã công bố (±3),PASS,tổng audit = 773 vs công bố = 773 | lệch >3: không
+I,Đồng hồ tường (CSV) tương quan RTT pcap qua 26 cấu hình,PASS,Pearson r = 1.000 trên 26 cấu hình

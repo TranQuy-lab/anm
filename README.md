@@ -14,13 +14,17 @@ trong repo này.
 
 | # | Phát hiện | Số liệu |
 |---|---|---|
-| 1 | Chi phí byte của bắt tay hybrid là thật và lớn | Client **4.96×** (297 → 1473 B); server **2.40×** (768 → 1846 B) |
+| 1 | Chi phí byte của bắt tay hybrid là thật và lớn | ClientHello thuần **6.42×** (217 → 1393 B); toàn bộ flight client **4.96×** (297 → 1473 B); server **2.40×** (768 → 1846 B). Δclient = **+1176 B** — khớp 0.0% lý thuyết ML-KEM-768 |
 | 2 | RTT bắt tay gần như không đổi trong mọi kịch bản có PMTUD đúng | Chênh lệch trung vị ≤ 0.25 ms; Cohen's d ≤ 0.28; p > 0.05 sau hiệu chỉnh Holm |
 | 3 | Độ tin cậy bắt tay không suy giảm khi xử lý MTU đúng | 0/780 thất bại trên 26 cấu hình (loss 0–3%, delay 0–50 ms, MTU 576–1500) |
 | 4 | Rủi ro thực tế nằm ở PMTUD/ICMP: khi ICMP "fragmentation needed" bị chặn và MTU nhỏ, bắt tay hybrid **treo hoàn toàn** | Tái hiện có kiểm soát trong lab |
 | 5 | Classifier lưu lượng dùng đặc trưng volume/sequence **kháng** drift giao thức PQC | Accuracy 1.0 → 1.0 (cả MTU 1500 và 1280) |
 | 6 | Ranh giới của drift: chỉ các đặc trưng *chạm vào handshake* mới bị ảnh hưởng | Khớp cơ chế với literature (arXiv:2608.22683) |
 | 7 | Chuyển đổi PQC tạo tín hiệu fingerprint trực tiếp trên đường truyền | Phân loại nhóm KEM đạt **100% ± 0** chỉ từ 1 đặc trưng (kích thước packet đầu client: 297 B vs 1473 B) |
+
+**Kiểm định chéo độc lập (9 hạng mục mù — 9/9 PASS):** tái xuất số liệu bằng pipeline riêng
+(tshark JSON + phân cụm time-gap), placebo, hoán vị nhãn, đối chiếu lý thuyết FIPS 203, tính
+lại Wilcoxon/Holm — toàn bộ khớp. Chi tiết: `analysis/audit_kiemdinh.py`, mục 3.4 báo cáo.
 
 Kết luận vận hành: **PQC đắt về byte, rẻ về RTT** trên mạng khoẻ; checklist chuyển đổi nên
 bao gồm kiểm tra xử lý MTU/ICMP. Trong thập kỷ chuyển đổi, quan sát viên thụ động có thể tách

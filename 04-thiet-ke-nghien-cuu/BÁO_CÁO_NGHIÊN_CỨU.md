@@ -14,8 +14,10 @@ ML-KEM mặc định, router `tc/netem` kiểm soát mất gói/trễ/MTU, captu
 **26 cấu hình × 30 lặp = 780 bắt tay TLS 1.3** so sánh X25519 (cổ điển) với X25519MLKEM768
 (hybrid PQC), cộng **720 luồng ứng dụng** cho nghiên cứu phân loại lưu lượng. Kết quả chính:
 
-1. **Chi phí byte là thật và lớn:** dữ liệu bắt tay client tăng **4.96×** (297 → 1473 byte),
-   phía server **2.40×** (768 → 1846 byte) — khớp trần lý thuyết của ML-KEM-768.
+1. **Chi phí byte là thật và lớn:** ClientHello thuần tăng **6.42×** (217 → 1393 byte); toàn bộ
+   dữ liệu bắt tay client (gồm Finished/GET) tăng **4.96×** (297 → 1473 byte); phía server
+   **2.40×** (768 → 1846 byte). Hiệu ứng tuyệt đối **+1176 byte** phía client khớp lý thuyết
+   ML-KEM-768 (ciphertext 1088 B + header) với sai lệch 0.0%.
 2. **Nhưng RTT bắt tay gần như không đổi** trong mọi kịch bản có chức năng PMTUD (chênh lệch
    trung vị ≤ 0.25 ms trên nền ~1.5–2 ms; Cohen's d ≤ 0.28, không ý nghĩa sau hiệu chỉnh
    Holm–Bonferroni): TLS 1.3 chỉ cần 1 RTT nên byte thừa "nhét cùng flight".
@@ -92,8 +94,15 @@ tái lập `docker-lab/`.
 
 | Thành phần | X25519 | X25519MLKEM768 | Tỉ lệ |
 |---|---|---|---|
-| Client (ClientHello, novel bytes) | 297 B | 1473 B | **4.96×** |
+| ClientHello thuần | 217 B | 1393 B | **6.42×** |
+| Client toàn bộ flight bắt tay (CH + Finished/GET) | 297 B | 1473 B | 4.96× |
 | Server (SH+EE+Cert+CV+Fin) | 768 B | 1846 B | **2.40×** |
+
+*Lưu ý định nghĩa: các chỉ số ban đầu của báo cáo này tính "client" gồm cả flight-2
+(Finished + GET, +80 B hằng số giữa hai nhóm — không ảnh hưởng mọi so sánh tương đối và
+kiểm định thống kê); kiểm định độc lập (mục 3.4) đã phát hiện và tách bạch hai định nghĩa.
+Hiệu ứng tuyệt đối phía client: **+1176 B**, khớp đúng ciphertext ML-KEM-768 (1088 B) cộng
+header key_share — bằng chứng dữ liệu phản ánh đúng cơ chế mật mã.*
 
 **Bảng 2 — RTT bắt tay (Wilcoxon paired, hiệu chỉnh Holm trong họ `hs_rtt`, 13 cấu hình):**
 
@@ -163,6 +172,29 @@ huấn luyện lại.
 ![Hình 4 — Drift và thích ứng của classifier (MTU 1500)](analysis/figs/fig4_drift_adaptation.png)
 
 ![Hình 4b — Biến thể MTU 1280](analysis/figs/fig4b_drift_m1280.png)
+
+### 3.4 Kiểm định chéo độc lập (blind audit 9 hạng mục — tất cả PASS)
+
+Sau khi công bố kết quả, toàn bộ dữ liệu thô được rà lại bằng một pipeline trích xuất **viết
+riêng, không tái sử dụng code gốc** (`analysis/audit_kiemdinh.py`): `tshark -T json` thay vì
+`-T fields`; định nghĩa flight bằng phân cụm khoảng-thời-gian từng chiều thay vì mốc sự kiện;
+client xác định theo cổng/subnet thay vì cờ SYN. Chín lược kiểm:
+
+| # | Lược kiểm | Kết quả |
+|---|---|---|
+| A | Tái xuất độc lập 4 số công bố | 297/768/1473/1846 — khớp tuyệt đối; phát hiện tách định nghĩa CH thuần (6.42×) |
+| B | Placebo: chia đôi ngẫu nhiên cùng nhóm, 200 lần | tỷ lệ p<0.05 = 0.000 ≤ ngưỡng 0.10 |
+| C | Đối chiếu lý thuyết FIPS 203 | Δclient = +1176 B — lệch 0.0%; Δserver +1078 B (lệch 6.4% so xấp xỉ 1152) |
+| D | Fingerprint mù bằng ngưỡng 800 B (không nhãn) | accuracy 1.0000 (353 flows) |
+| E | Chỉ đặc trưng handshake thuần cho 6 lớp site | 0.238 ≈ ngẫu nhiên → xác nhận cơ chế kháng drift |
+| F | Hoán vị nhãn nhóm (hủy tín hiệu), 300 lần | 4.3% ≈ 5% — bộ kiểm định hiệu chuẩn đúng |
+| G | Tính lại Wilcoxon + Holm–Bonferroni | khớp từng giá trị bảng công bố |
+| H | Toàn vẹn số flow/cấu hình | 773 = 773, không cấu hình nào lệch >3 |
+| I | Đồng hồ tường ↔ RTT pcap, 26 cấu hình | Pearson r = 1.000 |
+
+Kết luận kiểm định: **không phát hiện sai số dữ liệu hay thiên lệch pipeline**; hai điều chỉnh
+được đưa vào bản báo cáo này — (i) tách nhãn "ClientHello thuần" khỏi "toàn bộ flight client"
+(Bảng 1), (ii) bổ sung tỉ lệ 6.42× sắc hơn. Chi tiết từng hạng mục: `analysis/tables/audit_results.csv`.
 
 ## 4. Hạn chế (threats to validity)
 
