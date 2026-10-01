@@ -331,8 +331,10 @@ Bốn kết luận:
    hoặc PMTU 1500 (c6).
 3. **X25519 miễn nhiễm ở PMTU 1280** (c3: 6/6) vì mọi thông điệp của nó vừa một packet.
 4. **Ở PMTU 576, X25519 cũng hỏng** (c9: 0/6). Vậy rủi ro thuộc về **kích thước vượt PMTU**,
-   không phải đặc quyền của PQC. PQC chỉ **dịch ngưỡng** từ "PMTU < ~800 B" lên "PMTU < ~1400 B",
-   tức là đưa nhiều đường truyền thực tế (VPN, tunnel, IPv6 tối thiểu 1280) vào vùng nguy hiểm.
+   không phải đặc quyền của PQC. PQC chỉ **dịch ngưỡng an toàn**: X25519 cần PMTU ≳ 820 B
+   (giới hạn bởi flight server 767 B), trong khi hybrid cần PMTU ≳ 1450 B (giới hạn bởi
+   ClientHello 1393 B cộng header IP/TCP/Ethernet) — tức là đưa nhiều đường truyền thực tế
+   (VPN, tunnel, IPv6 tối thiểu 1280) vào vùng nguy hiểm.
 
 Đây là khoảng trống y văn mà chúng tôi tìm nhiều truy vấn khác nhau **không** thấy công trình
 nào lấp (xem mục 1.2). Khuyến nghị vận hành rút ra: **clamp MSS tại biên** và **không lọc
