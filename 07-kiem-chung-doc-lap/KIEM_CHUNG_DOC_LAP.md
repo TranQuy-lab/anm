@@ -215,6 +215,22 @@ Vòng 3 phản biện **bản đã sửa hai lần** và tìm ra:
 | Ô drift "bắt tay thuần" ở cột MTU 1280 ghi 0,188 (giá trị của MTU 1500) | MAJOR | Sửa thành 0,167; thêm `within1280_handshake` vào `rq23_summary.json` |
 | **Tiền lệ PMTUD nói chung** (RFC 2923, RFC 8899, Luckie & Stasiewicz IMC 2012) không được trích | MAJOR | Bổ sung và **thu hẹp tuyên bố** thành "chưa đo **cho bắt tay PQC**" |.
 
+## 7b. Vòng phản biện thứ tư
+
+Vòng 4 xác minh các sửa của vòng 3 và tìm thêm:
+
+| Phát hiện | Mức | Đã sửa |
+|---|---|---|
+| **Đoạn Holm toàn cục trong §3.3 đã cũ**: báo cáo nói "150 test, 78/150 có ý nghĩa" với các p-value cũ, trong khi `rq1_stats.csv` hiện có **156 test, 81 có ý nghĩa** (thay đổi do bản sửa `seq_raw` ở vòng 3). Checker không bắt được vì chỉ kiểm sự **có mặt** | CRITICAL | Cập nhật số trong báo cáo; checker nay **TÍNH LẠI** số test, số có ý nghĩa, từng p-value Holm toàn cục, tỉ lệ 4/13 và 11/13, cột % của Bảng 3 và Δ của bảng phân rã |
+| **Thí nghiệm ngưỡng bị confound**: chỉ giới hạn chiều client→server (MTU_A=1500) và offload của endpoint vẫn bật, nên "ngưỡng 1445 B" chỉ đúng cho ClientHello, không phải cho cả bắt tay | CRITICAL | Thêm **sweep ĐỐI XỨNG**; kết quả: ở 1445/1460 ClientHello **đã qua** mà bắt tay **vẫn hỏng** ⇒ nút thắt là **flight server** (MSS 1460 → gói 1500 B); ngưỡng đúng là **≥ 1500 B** cho hybrid và ~820 B cho X25519. Bảng 5 nay có hai phần (a)/(b) và câu kết luận đã sửa |
+| Checker vẫn "presence-only" ở phần văn xuôi và bảng audit; số nguyên không được kiểm; có lỗi sống: bảng §4 dòng I ghi "~165 ms" trong khi `audit_results.csv` ghi 62–64 ms (delay 0) và 464–466 ms (delay 50) | MAJOR | Checker nay phủ **253 mục** gồm số nguyên cho các dòng audit có dữ liệu số, và tính lại các giá trị; dòng I đã sửa theo đúng CSV |
+| Check K2 kiểm c9 bằng tiêu chí **rỗng** (sẽ PASS cả khi server không gửi gì) | MAJOR | Thêm yêu cầu **ClientHello 217 B đã qua** tới server, chứng minh kết luận "drop im lặng chiều về" có nội dung |
+| `wire_cl_first` có 1/780 giá trị sai (165 thay vì 1228, do lấy gói gửi lại đuôi) | MINOR | Lấy segment theo **`seq_raw` nhỏ nhất**; nay 0/780 sai |
+| `rq23` vẫn dùng `cl_ch_bytes` (đặc trưng bị GSO gộp) trong họ "bắt tay" | MINOR | Bỏ `cl_ch_bytes` khỏi họ bắt tay; kết quả không đổi (1,000 vs 0,167/0,160) |
+| Tiền lệ: GRO/TSO che cách chia packet của bắt tay đã được ghi nhận công khai; arXiv:2605.02978 có kịch bản fragmentation/coalescing cho TLS hậu lượng tử | — | Bổ sung vào tài liệu tham khảo và **thu hẹp tuyên bố**; thêm hạn chế "offload ở endpoint vẫn bật" |
+
+Sau vòng 4: audit **15/15 PASS**, checker **253 mục không sai lệch**.
+
 ## 8. Bảng đối chiếu v1 → v2
 
 | Hạng mục | v1 | v2 |

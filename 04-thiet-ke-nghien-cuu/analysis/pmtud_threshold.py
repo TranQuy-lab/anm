@@ -20,42 +20,62 @@ def fields(pcap, filt, flds):
     return [l.split("\t") for l in out if l.strip()]
 
 rows = []
-for f in sorted(glob.glob(os.path.join(LAB, "pcap_thr_*.pcapng"))):
+# ÁNH XẠ TƯỜNG MINH: sweep đối xứng chạy sau đã ghi đè các pcap cùng tên của sweep bất đối
+# xứng ở những MTU trùng nhau (lỗi vận hành đã ghi nhận). Vì vậy pcap chỉ được dùng cho đúng
+# sweep mà nó thuộc về; còn TỈ LỆ HOÀN TẤT luôn lấy từ CSV kết quả tương ứng.
+SWEEPS = [("asym", {900, 1440, 1448}, "pmtud_threshold.csv",
+           "đường có NÚT THẮT GIỮA: MTU_A=1500, MTU_B=MTU"),
+          ("sym", {820, 1200, 1400, 1445, 1460, 1500, 1520}, "pmtud_threshold_sym.csv",
+           "đường ĐỐI XỨNG: MTU_A=MTU_B=MTU")]
+for sweep, mtus, csvname, desc in SWEEPS:
+  for f in sorted(glob.glob(os.path.join(LAB, "pcap_thr_*.pcapng"))):
     m = re.match(r"pcap_thr_(\d+)_(X25519MLKEM768|X25519)\.pcapng$", os.path.basename(f))
     if not m:
         continue
     mtu, grp = int(m.group(1)), m.group(2)
+    if mtu not in mtus:
+        continue
     c2s = fields(f, "ip.src==172.30.20.3 && tcp.len>0", ["tcp.len"])           # client -> server
     s2c = fields(f, "ip.src==172.30.10.2 && tcp.len>0", ["tcp.len"])           # server -> client (egress)
     icmp = len(fields(f, "icmp.type==3 && icmp.code==4", ["frame.number"]))
-    rows.append(dict(mtu_b=mtu, group=grp,
+    rows.append(dict(sweep=sweep, mtu_b=mtu, group=grp, desc=desc,
                      ch_crossed=len(c2s) > 0, ch_seg_max=max([int(r[0]) for r in c2s] or [0]),
                      srv_crossed=len(s2c) > 0, srv_seg_max=max([int(r[0]) for r in s2c] or [0]),
                      icmp=icmp))
 
 T = pd.DataFrame(rows)
-csv = os.path.join(LAB, "pmtud_threshold.csv")
 res = {}
-if os.path.exists(csv):
+for sweep, mtus, csvname, desc in SWEEPS:
+    csv = os.path.join(LAB, csvname)
+    if not os.path.exists(csv):
+        continue
     D = pd.read_csv(csv)
     g = D.groupby(["mtu_b", "group"]).established.agg(n="size", ok="mean").reset_index()
-    T = T.merge(g, on=["mtu_b", "group"], how="left")
-    for _, r in T.sort_values(["mtu_b", "group"]).iterrows():
-        res[f"M{int(r.mtu_b)}|{r.group}"] = dict(
-            ch_crossed=bool(r.ch_crossed), ch_max_seg=int(r.ch_seg_max),
-            srv_crossed=bool(r.srv_crossed), srv_max_seg=int(r.srv_seg_max),
-            icmp=int(r.icmp), n=int(r.n) if pd.notna(r.n) else 0,
-            completed=round(float(r.ok), 2) if pd.notna(r.ok) else None)
-    print(f"{'MTU_B':>6} {'nhóm':<16} {'CH→server':>10} {'max':>5} {'server→client':>14} {'max':>5} {'ICMP':>5} {'hoàn tất':>9}")
-    for k, v in res.items():
-        print(f"{k.split('|')[0]:>6} {k.split('|')[1]:<16} {str(v['ch_crossed']):>10} {v['ch_max_seg']:>5} "
-              f"{str(v['srv_crossed']):>14} {v['srv_max_seg']:>5} {v['icmp']:>5} {str(v['completed']):>9}")
-    # ngưỡng suy ra
+    dirs = T[T.sweep == sweep].set_index(["mtu_b", "group"])
+    print(f"=== sweep: {sweep} — {desc} ({csvname}) ===")
+    print(f"{'MTU':>6} {'nhóm':<16} {'CH→server':>10} {'max':>5} {'server→client':>14} {'ICMP':>5} {'hoàn tất':>9}")
+    TS = g.copy()
+    for _, r in g.sort_values(["mtu_b", "group"]).iterrows():
+        key = (int(r.mtu_b), r.group)
+        d = dirs.loc[key] if key in dirs.index else None
+        ch = str(bool(d.ch_crossed)) if d is not None else "—"
+        chmax = int(d.ch_seg_max) if d is not None else "—"
+        ic = int(d.icmp) if d is not None else "—"
+        print(f"{int(r.mtu_b):>6} {r.group:<16} {ch:>10} {str(chmax):>5} "
+              f"{str(bool(d.srv_crossed)) if d is not None else '—':>14} {str(ic):>5} {r.ok:>9.2f}")
+        res[f"{sweep}|M{int(r.mtu_b)}|{r.group}"] = dict(
+            ch_crossed=bool(d.ch_crossed) if d is not None else None,
+            ch_max_seg=int(d.ch_seg_max) if d is not None else None,
+            srv_crossed=bool(d.srv_crossed) if d is not None else None,
+            icmp=int(d.icmp) if d is not None else None,
+            n=int(r.n), completed=round(float(r.ok), 2))
+    # ngưỡng: MTU nhỏ nhất mà CẢ 3 lần đều hoàn tất
     thr = {}
-    for grp in T.group.unique():
-        s = T[T.group == grp].sort_values("mtu_b")
-        ok = s[s.ok == 1.0]
+    for grp in g.group.unique():
+        ss = g[g.group == grp].sort_values("mtu_b")
+        ok = ss[ss.ok >= 0.999]
         thr[grp] = int(ok.mtu_b.min()) if len(ok) else None
-    res["threshold_completed"] = thr
+    res[f"threshold_completed_{sweep}"] = thr
+    print("  ngưỡng (MTU nhỏ nhất đạt 3/3):", thr, "\n")
 json.dump(res, open(os.path.join(BASE, "tables", "pmtud_threshold.json"), "w"), indent=2, ensure_ascii=False)
 print("\n[BẢNG] pmtud_threshold.json")

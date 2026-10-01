@@ -50,8 +50,10 @@ Bốn kết quả chính:
    Ở PMTU 576, **cả X25519 cũng hỏng** (0/6), nhưng vì hai lý do khác nhau đã kiểm tra trong
    pcap: hybrid là blackhole PMTUD (0 ICMP, ClientHello không tới server), còn X25519 là **drop
    im lặng ở chiều server→client trước router**. Rủi ro thuộc về *kích thước vượt PMTU*, không
-   phải đặc quyền của PQC. Cuối cùng, **ngưỡng PMTU an toàn được đo trực tiếp**: hybrid hỏng ở
-   1440 B và qua ở 1448 B ⇒ cần **≥ 1445 B**, trong khi X25519 sống ở mọi mức từ 900 B.
+   phải đặc quyền của PQC. Cuối cùng, **ngưỡng PMTU an toàn được đo trực tiếp**: ClientHello
+   hybrid cần ≥ 1445 B, nhưng trên đường có nút thắt giữa nhỏ hơn MTU của endpoint, bắt tay
+   hybrid chỉ thành công từ **1500 B** (vì flight server bị chia theo MSS 1460 thành gói 1500 B),
+   trong khi X25519 sống từ ~820 B.
 
 **Về khả năng nhận dạng lưu lượng:** chúng tôi **không** tuyên bố tính mới — quan sát thụ động
 phân biệt cổ điển/hậu lượng tử đã được công bố (arXiv:2503.17830; ePrint 2026/834;
@@ -349,22 +351,44 @@ chỉ nên so sánh **trong cùng một lần chạy**.
 | c8 | hybrid | **576** | off | chặn | **0/6** | 8,56 s | 0 |
 | c9 | X25519 | **576** | off | chặn | **0/6** | 8,59 s | 0 |
 
-**Bảng 5 — Ngưỡng PMTU an toàn, ĐO trực tiếp** (`run_pmtud_threshold.sh`, CLAMP=off, ICMP chặn,
-MTU_A=1500; 3 lần thử mỗi ô, mỗi ô có pcap riêng để kiểm cả hai chiều):
+**Bảng 5 — Ngưỡng PMTU an toàn, ĐO trực tiếp** (`run_pmtud_threshold{,_sym}.sh`, CLAMP=off,
+ICMP frag-needed bị chặn, 3 lần thử mỗi ô, mỗi ô có pcap riêng):
 
-| MTU_B | X25519: CH qua? | X25519 hoàn tất | Hybrid: CH qua? | Hybrid hoàn tất |
-|---|---|---|---|---|
-| 900 | ✓ (217 B) | 3/3 | ✗ (0 byte tới server) | **0/3** |
-| 1200 | ✓ | 3/3 | ✗ | **0/3** |
-| 1400 | ✓ | 3/3 | ✗ | **0/3** |
-| 1440 | ✓ | 3/3 | ✗ | **0/3** |
-| **1448** | ✓ | 3/3 | **✓ (một segment 1393 B)** | **3/3** |
+*(a) Đường có **nút thắt ở giữa** (MTU_A = 1500, MTU_B = MTU) — đúng kịch bản của mục này:*
 
-Ngưỡng **đo được**: hybrid cần **PMTU ≥ 1445 B** (1393 B ClientHello + 20 B IP + 32 B TCP có
-timestamp); X25519 sống ở mọi mức quét từ 900 B trở lên (gói lớn nhất phía client là 269 B).
-Ở ô 1448, ClientHello qua trong **đúng một** segment và **không cần ICMP** (0 gói) — đúng biên;
-hướng server→client không phải nút thắt ở mức này (server gửi flight 1846 B, router cắt theo
-MTU_A=1500 ở leg egress).
+| MTU_B | X25519 | hybrid | ClientHello hybrid có qua? |
+|---|---|---|---|
+| 900 | 3/3 | 0/3 | ✗ |
+| 1200 | 3/3 | 0/3 | — |
+| 1400 | 3/3 | 0/3 | — |
+| 1440 | 3/3 | 0/3 | ✗ |
+| **1448** | 3/3 | **3/3** | ✓ (một segment 1393 B) |
+
+*(b) Đường **đối xứng** (MTU_A = MTU_B = MTU) — MTU của endpoint bằng MTU đường truyền:*
+
+| MTU | X25519 | hybrid | ClientHello hybrid có qua? |
+|---|---|---|---|
+| 820 | 2/3 | 0/3 | ✗ |
+| 1200 | 3/3 | 0/3 | ✗ |
+| 1400 | 3/3 | 0/3 | ✗ |
+| 1445 | 3/3 | **0/3** | **✓** (1393 B) |
+| 1460 | 3/3 | **0/3** | **✓** (1393 B) |
+| **1500** | 3/3 | **3/3** | ✓ |
+| 1520 | 3/3 | 3/3 | ✓ |
+
+**Hai ngưỡng khác nhau, và cái chặn thật là cái lớn hơn.** ClientHello một mình cần
+PMTU ≥ **1445 B** (hỏng ở 1440, qua ở 1448). Nhưng ở 1445 và 1460 — nơi ClientHello **đã qua
+được** (một segment 1393 B) — bắt tay **vẫn hỏng**: nút thắt là **chiều về**, vì flight server
+1845 B bị chia theo MSS 1460 (endpoint vẫn tưởng MTU của mình là 1500) thành các gói 1500 B,
+vượt PMTU. Chỉ từ **1500 B** cả hai chiều mới vừa. Vậy:
+
+> Trên đường có nút thắt giữa nhỏ hơn MTU của endpoint, **bắt tay hybrid cần PMTU ≥ 1500 B**,
+> còn **X25519 cần ≳ 820–1200 B** (2/3 ở 820 B, 3/3 từ 1200 B). Tức PQC dịch ngưỡng an toàn từ
+> **~820 B lên ~1500 B** — bao trùm cả MTU tối thiểu của IPv6 (1280 B) và phần lớn đường VPN/tunnel.
+
+*(Ghi chú vận hành: sweep đối xứng chạy sau đã ghi đè pcap cùng tên của sweep bất đối xứng ở các
+MTU trùng nhau; vì vậy tỉ lệ hoàn tất luôn lấy từ CSV kết quả, còn dữ liệu hướng chỉ lấy từ pcap
+thuộc đúng sweep — xem ánh xạ tường minh trong `analysis/pmtud_threshold.py`.)*
 
 **Cơ chế, nhìn trực tiếp trong pcap** (đây là phần bản v1 hoàn toàn thiếu):
 

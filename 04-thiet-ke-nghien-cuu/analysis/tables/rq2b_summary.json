@@ -30,7 +30,7 @@
       "server_flight_bytes_PQC": 1845.0,
       "ch_segments_egress_X": 1.0,
       "ch_segments_egress_PQC": 2.0,
-      "threshold_800_egress_first_pkt_acc": 0.9972222222222222,
+      "threshold_800_egress_first_pkt_acc": 1.0,
       "threshold_800_client_flight_acc": 1.0
     },
     "1500": {

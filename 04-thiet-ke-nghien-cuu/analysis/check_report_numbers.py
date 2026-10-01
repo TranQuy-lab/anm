@@ -132,32 +132,36 @@ def main():
         chk(num(c[7]) == icmp_cell.get(pmap[c[0]], -1),
             f"Bảng 4 {c[0]}: số ICMP báo cáo {c[7]} ≠ pcap {icmp_cell.get(pmap[c[0]])}")
 
-    # ---------- Bảng 5: ngưỡng PMTU đo được (đọc từ pcap + pmtud_threshold.csv) ----------
-    if "threshold_completed" in THR:
-        chk(THR["threshold_completed"].get("X25519") == 900, "Bảng 5: ngưỡng X25519 phải là 900 (mức quét thấp nhất)")
-        chk(THR["threshold_completed"].get("X25519MLKEM768") == 1448, "Bảng 5: ngưỡng hybrid phải là 1448")
-        chk(THR.get("M1440|X25519MLKEM768", {}).get("ch_crossed") is False, "Bảng 5: hybrid@1440 phải KHÔNG qua")
-        chk(THR.get("M1448|X25519MLKEM768", {}).get("ch_crossed") is True, "Bảng 5: hybrid@1448 phải qua")
-        chk(THR.get("M1448|X25519MLKEM768", {}).get("icmp") == 0, "Bảng 5: @1448 không được có ICMP (đúng biên)")
-
-    # ---------- Bảng 5: ngưỡng PMTU — đối chiếu số hoàn tất trong báo cáo ----------
-    D5 = pd.read_csv(os.path.join(LAB, "pmtud_threshold.csv"))
-    g5 = D5.groupby(["mtu_b", "group"]).established.agg(n="size", ok="mean")
-    t5 = [l for l in rows_of(s, r"^\| \*{0,2}\d+\*{0,2} \|")
-          if ("✓" in l or "✗" in l) and l.count("|") >= 6]
-    chk(len(t5) == 5, f"Bảng 5: có {len(t5)} dòng, kỳ vọng 5")
-    for l in t5:
-        c = [x.strip().replace("*", "") for x in l.strip("|").split("|")]
-        mtu = int(c[0])
-        for col, grp in ((2, "X25519"), (4, "X25519MLKEM768")):
-            cell = c[col]
-            m = re.match(r"(\d+)/(\d+)", cell)
-            chk(m is not None, f"Bảng 5 MTU {mtu} {grp}: ô '{cell}' không có dạng n/N")
-            if m:
-                exp = g5.loc[(mtu, grp)]
-                chk(int(m.group(1)) == int(round(exp.ok * exp.n)),
-                    f"Bảng 5 MTU {mtu} {grp}: báo cáo {m.group(1)}/{m.group(2)} ≠ dữ liệu "
-                    f"{int(round(exp.ok*exp.n))}/{int(exp.n)}")
+    # ---------- Bảng 5: ngưỡng PMTU, HAI bảng (a) nút thắt giữa và (b) đối xứng ----------
+    if "*(a)" in s and "*(b)" in s:
+        sec = s[s.index("*(a)"):]
+        panels = [("*(a)", sec[:sec.index("*(b)")], "pmtud_threshold.csv", "nút thắt giữa"),
+                  ("*(b)", sec[sec.index("*(b)"):], "pmtud_threshold_sym.csv", "đối xứng")]
+        for tag, txt, csvname, label in panels:
+            D5 = pd.read_csv(os.path.join(LAB, csvname))
+            g5 = D5.groupby(["mtu_b", "group"]).established.agg(n="size", ok="mean")
+            t5 = [l for l in txt.splitlines()
+                  if re.match(r"^\| \*{0,2}\d+\*{0,2} \|", l) and ("✓" in l or "✗" in l)]
+            chk(len(t5) > 0, f"Bảng 5{tag} ({label}): không đọc được dòng dữ liệu nào")
+            for l in t5:
+                c = [x.strip().replace("*", "") for x in l.strip("|").split("|")]
+                mtu = int(c[0])
+                for col, grp in ((1, "X25519"), (2, "X25519MLKEM768")):
+                    m = re.match(r"(\d+)/(\d+)", c[col])
+                    chk(m is not None, f"Bảng 5{tag} MTU {mtu} {grp}: ô '{c[col]}' không dạng n/N")
+                    if not m:
+                        continue
+                    try:
+                        exp = g5.loc[(mtu, grp)]
+                    except KeyError:
+                        chk(False, f"Bảng 5{tag} MTU {mtu} {grp}: không có trong {csvname}")
+                        continue
+                    chk(int(m.group(1)) == int(round(exp.ok * exp.n)),
+                        f"Bảng 5{tag} MTU {mtu} {grp}: báo cáo {m.group(1)}/{m.group(2)} ≠ dữ liệu "
+                        f"{int(round(exp.ok*exp.n))}/{int(exp.n)}")
+        # hai ngưỡng phải được nêu đúng
+        for tok in ("1445", "1500", "820"):
+            chk(tok in s, f"Bảng 5: thiếu số ngưỡng {tok}")
 
     # ---------- bảng phân rã RTT ----------
     for l in rows_of(s, r"^\| (1500|576) \| 0,\d+ → 0,\d+ ms"):
