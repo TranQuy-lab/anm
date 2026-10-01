@@ -271,11 +271,11 @@ với kỳ vọng công suất ở n = 30 (chỉ phát hiện chắc chắn hi�
 mất gói làm phương sai tăng mạnh nên không đủ công suất). Kết luận đúng là: **mức tăng nhỏ,
 có thật, và không phải là một vòng RTT thêm**.
 
-**Kiểm định độ bền với hiệu chỉnh khắt khe hơn.** Toàn bộ 150 test (12 metric × 13 cấu hình) cũng
+**Kiểm định độ bền với hiệu chỉnh khắt khe hơn.** Toàn bộ **156 test** (12 metric × 13 cấu hình) cũng
 được hiệu chỉnh Holm trong **một họ duy nhất** (khắt khe hơn nhiều so với Holm theo từng họ metric).
-Khi đó vẫn còn **78/150 test có ý nghĩa**, trong đó có chính các so sánh RTT: `hs_rtt` ở
-L0_D0_M576 (`p_holm_global` = 0,033), L0_D0_M1500 (0,041), L3_D50_M1280 (0,00085), và metric
-phân rã `rtt_ch_to_sv1` ở **bốn** cấu hình (0,00012 / 0,0043 / 0,00005 / 0,0271). Kết luận về RTT không phụ
+Khi đó vẫn còn **81/156 test có ý nghĩa**, trong đó có chính các so sánh RTT: `hs_rtt` ở
+L0_D0_M576 (`p_holm_global` = 0,035), L0_D0_M1500 (0,042), L3_D50_M1280 (0,00088), và metric
+phân rã `rtt_ch_to_sv1` ở **bốn** cấu hình (0,00012 / 0,0045 / 0,00005 / 0,028). Kết luận về RTT không phụ
 thuộc cách định nghĩa họ hiệu chỉnh.
 
 Phân rã RTT (mạng sạch) định vị chi phí:
@@ -487,7 +487,7 @@ Kết quả audit tự động (`analysis/audit_kiemdinh.py`, output `tables/aud
 | F | Hoán vị nhãn nhóm (hủy tín hiệu thật), 300 lần | **PASS** — tỉ lệ p<0,05 là 0,063 ≈ 5% |
 | G | Tính lại Mann–Whitney + Holm, khớp bảng công bố | **PASS** — khớp từng giá trị |
 | H | Hoà giải số flow bắt được với số lần chạy client | **PASS** — 780 chạy (rc=0: 780) = 780 flow |
-| I | Toàn vẹn thiết kế xen kẽ: hai nhóm cân bằng, xen kẽ | **PASS** — 30/30 mỗi cấu hình; lệch SYN trong cặp ~165 ms |
+| I | Toàn vẹn thiết kế xen kẽ **theo từng cấu hình**: đủ 13 cấu hình, hai nhóm cân bằng, mọi lần chạy rc=0 | **PASS** — 30/30 mỗi cấu hình; khoảng cách cặp 64 ms (L0_D0_M1280), 62 ms (L0_D0_M1500), 63 ms (L0_D0_M576), 464 ms (L0_D50_M1280), 466 ms (L0_D50_M1500), tất cả dưới ngưỡng theo cấu hình |
 | J | Phân mảnh cấp wire **tính lại từ pcap**; MTU có hiệu lực thật trên leg egress | **PASS** — client 1→1/1→2/1→3 và server 1→2/1→2/2→4 segment ở MTU 1500/1280/576; gói egress lớn nhất = MTU−52 |
 | K | PMTUD blackhole có kiểm soát | **PASS** — c1 0/6, c2–c7 6/6, c8 và c9 0/6 |
 | K2 | **Cơ chế trong pcap** cho cả bốn ô: cho qua / chặn / c8 (hybrid@576) / c9 (X25519@576) | **PASS** — c2: 6 ICMP và CH được chia lại 1228+165; c1 **và c8**: 0 ICMP, gửi lại nguyên 1393 B 36 lần, egress rỗng; c9: 0 ICMP, 0 gói server→client tới được client |
@@ -501,7 +501,12 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 
 ## 5. Hạn chế (threats to validity)
 
-1. **Quy mô lab.** Một máy, liên kết veth không giới hạn băng thông, delay ≤ 50 ms. Chênh lệch
+1. **Offload ở endpoint vẫn bật.** Chúng tôi chỉ tắt GSO/TSO/GRO trên NIC của **router**; NIC của
+   client/server vẫn bật, nên cách **endpoint** chia packet không được quan sát trực tiếp — mọi
+   con số "cấp wire" trong báo cáo là cách chia ở **leg egress của router**. Đây đúng là loại
+   artifact đã làm sai kết luận ở bản v1 (và đã được ghi nhận công khai trong y văn kỹ thuật).
+   Hệ quả cụ thể: thí nghiệm ngưỡng PMTU ở mục 3.5 **chỉ** giới hạn được chiều client→server.
+2. **Quy mô lab.** Một máy, liên kết veth không giới hạn băng thông, delay ≤ 50 ms. Chênh lệch
    RTT cỡ 0,2–0,4 ms là chi phí xử lý/segment của host, **không** đại diện cho Internet thật.
    Giá trị tuyệt đối thay đổi theo mức tải máy host (đo được 1,2–1,8 ms khi máy rảnh và
    2,7–3,1 ms khi máy bận) nên chỉ so sánh **trong cùng một lần chạy** — và đó là điều thiết
@@ -574,6 +579,12 @@ H (so pipeline với chính nó thay vì so với số lần chạy client).
 17. IETF, **RFC 2923** *TCP Problems with Path MTU Discovery*, Informational, 2000.
 18. IETF, **RFC 8899** *Packetization Layer Path MTU Discovery for Datagram Transports*, 2020.
 19. Luckie & Stasiewicz, *Measuring Path MTU Discovery Behaviour*, ACM IMC 2012.
+20. Delgado, *Observability for Post-Quantum TLS Readiness: A Multi-Surface Evidence Framework*,
+    arXiv:2605.02978, 5/2026 — có kịch bản **fragmentation và coalescing** cho TLS hậu lượng tử.
+21. IETF MAPRG, *Measuring the usable maximum packet size across internet paths* (nhóm nghiên cứu
+    đo lường vận hành) — bối cảnh cho cách đặt vấn đề PMTU.
+22. Ghi chép kỹ thuật: GRO/TSO che cách chia packet thật của bắt tay TLS (bài công khai 9/2025) —
+    cùng loại artifact mà chúng tôi gặp và đã sửa ở đây (mục 5).
 
 ---
 

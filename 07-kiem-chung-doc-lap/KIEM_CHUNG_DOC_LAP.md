@@ -215,7 +215,7 @@ Vòng 3 phản biện **bản đã sửa hai lần** và tìm ra:
 | Ô drift "bắt tay thuần" ở cột MTU 1280 ghi 0,188 (giá trị của MTU 1500) | MAJOR | Sửa thành 0,167; thêm `within1280_handshake` vào `rq23_summary.json` |
 | **Tiền lệ PMTUD nói chung** (RFC 2923, RFC 8899, Luckie & Stasiewicz IMC 2012) không được trích | MAJOR | Bổ sung và **thu hẹp tuyên bố** thành "chưa đo **cho bắt tay PQC**" |.
 
-## 7. Bảng đối chiếu v1 → v2
+## 8. Bảng đối chiếu v1 → v2
 
 | Hạng mục | v1 | v2 |
 |---|---|---|

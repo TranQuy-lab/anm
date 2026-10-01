@@ -123,7 +123,9 @@ def connection_features(legs):
             # chỉ tính flight ClientHello (trước khi server gửi byte dữ liệu đầu tiên)
             e = e[(e["tcplen"] > 0) & (e["time"] >= t_ch - 0.05) & (e["time"] < t_sv1)]
             wire_cl_nseg, wire_cl_bytes = int(len(e)), float(e["tcplen"].sum())
-            wire_cl_first = float(e["tcplen"].iloc[0]) if len(e) else np.nan
+            # lấy segment ĐẦU của ClientHello theo seq_raw (gói gửi lại đuôi có seq lớn hơn,
+            # nếu lấy .iloc[0] theo thời gian có thể nhầm một mảnh đuôi — đã gặp 1/780 ca)
+            wire_cl_first = float(e.sort_values("seqraw")["tcplen"].iloc[0]) if len(e) else np.nan
 
         out.append({
             "ok": 1, "stream": L["stream"], "t_syn": float(g["time"].min()),

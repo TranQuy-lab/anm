@@ -243,9 +243,7 @@ if fl1500 and os.path.exists(csv_sites):
         true.append(1 if meta["group"].values[k] == "X25519MLKEM768" else 0)
     if pred:
         acc = float((np.array(pred) == np.array(true)).mean())
-        d_ok_min = len(pred) >= 100          # không cho PASS trên vài dòng khớp được
-        if not d_ok_min:
-            d_ok, d_msg = False, f"chỉ ghép được {len(pred)} flow (<100) — không đủ để kết luận"
+        # min-n được kiểm ở điều kiện d_ok bên dưới (không cho PASS trên vài dòng khớp được)
         vals = sorted({x["c1"] for x in fl1500})
         d_ok = (acc == 1.0) and (len(vals) == 2) and len(pred) >= 100
         d_msg = (f"accuracy = {acc:.4f} trên {len(pred)} flow (nhãn lấy từ CSV lần chạy, KHÔNG suy từ pcap) | "
@@ -506,7 +504,10 @@ if m1 and m2 and m8 and m9:
             and max(m2["egr"] or [0]) <= 1228
             and m1["big"] == [1393] and m1["retr"] >= 5 and not m1["egr"]
             and m8["icmp"] == 0 and m8["big"] == [1393] and m8["retr"] >= 5 and not m8["egr"]
-            and m9["icmp"] == 0 and (srv_to_client("c9_x25519_576_drop") == 0))
+            # c9: CH (217 B) PHẢI đã qua được tới server, nhưng KHÔNG có dữ liệu server→client nào
+            # tới client ⇒ kết luận 'drop im lặng chiều về' mới có nội dung (nếu server không gửi gì
+            # thì tiêu chí cũ vẫn PASS một cách rỗng).
+            and m9["icmp"] == 0 and (217 in m9["egr"]) and (srv_to_client("c9_x25519_576_drop") == 0))
     check("K2", "Cơ chế trong pcap: ICMP ⇒ tự chia lại CH; chặn ICMP ⇒ blackhole (c1, c8); c9 = drop im lặng chiều server→client",
           okK2,
           f"c2 (cho qua): {m2['icmp']} ICMP, egress nhận {m2['egr']} (≤ MSS 1228), ingress gửi {m2['big']} | "

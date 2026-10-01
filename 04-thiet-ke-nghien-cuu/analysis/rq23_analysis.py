@@ -89,7 +89,10 @@ def site_flows(df, pcap, csv_path):
 SIZE_TOTAL = ["srv_total","cli_total","n_srv_pkts","n_cli_pkts"]
 APP_TOTAL = ["app_srv_bytes","n_app_srv_pkts","app_dur","mean_iat_app"]
 APP_SEQ = [f"as_{j}" for j in range(K)]
-HS_FEAT = ["cl_ch_bytes","cl_hs_bytes","sv_hs_bytes","cl_ch_nseg"]
+# Họ "bắt tay": CHỈ dùng tổng byte và số segment — KHÔNG dùng `cl_ch_bytes` (kích thước packet
+# đầu ở leg ingress), vì GSO của client gộp nó thành một super-packet ở mọi MTU (artifact đã bị
+# v3 của rq2b chỉ ra). Tổng byte và số segment không phụ thuộc cách gộp.
+HS_FEAT = ["cl_hs_bytes","sv_hs_bytes","cl_ch_nseg"]
 
 def time_split(D, frac=0.6, label="site"):
     """Chia theo THỜI GIAN trong từng lớp: flow sớm → train, flow muộn → test."""

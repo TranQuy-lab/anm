@@ -17,7 +17,8 @@ LAB = os.path.abspath(os.path.join(BASE, "..", "..", "docker-lab", "results"))
 
 def num(x):
     x = (x.replace("*", "").replace(",", ".").replace("−", "-").replace("–", "-")
-          .replace("ms", "").replace("B", "").replace("(timeout)", "").replace("s", "").replace(" ", ""))
+          .replace("ms", "").replace("B", "").replace("(timeout)", "").replace("%", "")
+          .replace("s", "").replace(" ", ""))
     return float(x)
 
 def same(got, exp, dec):
@@ -43,8 +44,6 @@ def main():
     O = json.load(open(os.path.join(BASE, "tables", "order_control.json")))
     C23 = json.load(open(os.path.join(BASE, "tables", "rq23_summary.json")))
     THR = json.load(open(os.path.join(BASE, "tables", "pmtud_threshold.json")))
-    CB = json.load(open(os.path.join(BASE, "tables", "ch_budget.json"))) \
-        if os.path.exists(os.path.join(BASE, "tables", "ch_budget.json")) else None
     errs, n = [], 0
 
     def chk(cond, msg):
@@ -208,6 +207,78 @@ def main():
         if exp is not None:
             chk(same(num(c[1]) if "→" not in c[1] else 1.0, exp, 3), f"§3.6 '{c[0]}' baseline ≠ dữ liệu")
 
+    # ---------- Holm TOÀN CỤC: TÍNH LẠI (không chỉ kiểm sự có mặt) ----------
+    tot = len(S); sig = int((S.p_holm_global < 0.05).sum())
+    chk(f"{tot} test" in s, f"Holm toàn cục: báo cáo phải nêu '{tot} test'")
+    chk(f"{sig}/{tot}" in s, f"Holm toàn cục: báo cáo phải nêu '{sig}/{tot}' (dữ liệu hiện có)")
+    def pg(metric, l, d, m):
+        q = S[(S.metric == metric) & (S.loss == l) & (S.delay == d) & (S.mtu == m)]
+        return float(q.iloc[0].p_holm_global) if len(q) else float("nan")
+    for tok, exp in [("0,035", pg("hs_rtt", 0, 0, 576)), ("0,042", pg("hs_rtt", 0, 0, 1500)),
+                     ("0,00088", pg("hs_rtt", 3, 50, 1280)), ("0,00012", pg("rtt_ch_to_sv1", 0, 0, 576)),
+                     ("0,0045", pg("rtt_ch_to_sv1", 0, 0, 1500)), ("0,00005", pg("rtt_ch_to_sv1", 3, 50, 1280)),
+                     ("0,028", pg("rtt_ch_to_sv1", 0, 50, 1280))]:
+        t = tok.replace(",", ".")
+        chk(tok in s and same_sig(float(t), exp, t), f"Holm toàn cục: '{tok}' không khớp dữ liệu ({exp:.6g})")
+
+    # ---------- tỉ lệ 4/13, 11/13: TÍNH LẠI ----------
+    q13 = S[S.metric == "hs_rtt"]
+    chk(f"{int((q13.p_holm < 0.05).sum())}/{len(q13)}" in s,
+        f"Báo cáo phải nêu tỉ lệ Holm {int((q13.p_holm < 0.05).sum())}/{len(q13)}")
+    chk(f"{int((q13.med_b > q13.med_a).sum())}/{len(q13)}" in s,
+        f"Báo cáo phải nêu tỉ lệ hướng dương {int((q13.med_b > q13.med_a).sum())}/{len(q13)}")
+
+    # ---------- cột % của Bảng 3 + câu "+14–17%" ----------
+    for l in rows_of(s, r"^\| [0-3] \| (0|50) \| (1500|1280|576) \|"):
+        c = [x.strip().replace("*", "") for x in l.strip("|").split("|")]
+        loss, delay, mtu = int(c[0]), int(c[1]), int(c[2])
+        r = S[(S.metric == "hs_rtt") & (S.loss == loss) & (S.delay == delay) & (S.mtu == mtu)].iloc[0]
+        exp = (r.med_b - r.med_a) / r.med_a * 100
+        chk(same(num(c[6]), exp, 1), f"Bảng 3 L{loss} D{delay} M{mtu} — cột %: báo cáo {c[6]} ≠ dữ liệu {exp:.1f}%")
+    for tok in ("14,0", "17,4"):
+        chk(tok in s, f"Câu tăng tương đối: thiếu '{tok}%' (giá trị của hai cấu hình delay 0 có ý nghĩa)")
+
+    # ---------- Bảng phân rã RTT: Δ của cả hai metric ----------
+    for l in rows_of(s, r"^\| (1500|576) \| 0,\d+ → 0,\d+ ms"):
+        c = [x.strip() for x in l.strip("|").split("|")]
+        mtu = int(c[0])
+        for col, metric in ((1, "rtt_ch_to_sv1"), (2, "cl_proc")):
+            r = S[(S.metric == metric) & (S.loss == 0) & (S.delay == 0) & (S.mtu == mtu)].iloc[0]
+            m = re.search(r"\+(\d+[.,]\d+)", c[col])
+            chk(m is not None and same(num(m.group(1)), (r.med_b - r.med_a) * 1000, 3),
+                f"Phân rã RTT M{mtu} {metric}: Δ báo cáo {c[col]} ≠ dữ liệu {(r.med_b-r.med_a)*1000:.3f} ms")
+
+    # ---------- Bảng drift §3.6 ← rq23_summary ----------
+    drift = C23.get("rq2_mtu_drift", {})
+    for l in rows_of(s, r"^\| (Tất cả|Tổng byte / tổng pha ứng dụng|Chuỗi gói pha ứng dụng|Bắt tay thuần) \|"):
+        c = [x.strip().replace("*", "").replace("(", " ").split()[0].rstrip(",") for x in l.strip("|").split("|")]
+        key = {"Tất cả": ("within1280_all", "train1500_test1280_all"),
+               "Tổng byte / tổng pha ứng dụng": ("within1280_app_totals", "train1500_test1280_app_totals"),
+               "Chuỗi gói pha ứng dụng": ("within1280_app_seq", "train1500_test1280_app_seq"),
+               "Bắt tay thuần": ("within1280_handshake", "train1500_test1280_handshake")}.get(c[0])
+        if not key:
+            continue
+        for col, k in ((1, key[0]), (2, key[1])):
+            if k not in drift:
+                errs.append(f"Bảng drift: thiếu khóa {k} trong rq23_summary.json"); n += 1; continue
+            chk(same(num(c[col]), drift[k]["acc"], 3), f"Bảng drift '{c[0]}' cột {col}: báo cáo {c[col]} ≠ {drift[k]['acc']:.4f}")
+
+    # ---------- kiểm số NGUYÊN cho vài dòng audit có dữ liệu số thuần ----------
+    int_pool = {}
+    for cid in ("C3", "K2", "I"):
+        row0 = A[A.CHECK == cid]
+        if not row0.empty:
+            r0 = row0.iloc[0]
+            int_pool[cid] = set(re.findall(r"\d+", str(r0["Tên"]) + " " + str(r0["Chi tiết"])))
+
+    for cid in ("C3", "K2"):
+        row = [l for l in rows_of(s, r"^\| " + cid + r" \|")]
+        if not row:
+            continue
+        cell = row[0].strip("|").split("|")[2]
+        for tok in re.findall(r"\d{2,}", cell):
+            chk(tok in int_pool[cid], f"Bảng audit {cid}: số nguyên '{tok}' không có trong audit_results.csv")
+
     # ---------- số trong văn xuôi ----------
     prose = [
         ("0,17–0,44 ms", "khoảng Δ RTT", r"0,17–0,44 ms"),
@@ -216,7 +287,6 @@ def main():
         ("p một phía 0,011 / hai phía 0,023 (xuất hiện ≥ 2 lần)", "sign test", r"(một phía p = 0,011; hai phía 0,023)|(một phía p = 0,011, hai phía 0,023)"),
         ("-0.358/+0.331", "đối chứng thứ tự", r"\+0,358 ms.*\+0,331 ms|\+0,358.*\+0,331"),
         ("0,15 ở 1% / 0,42 ở 3%", "retransmission", r"0,15 ở 1%.*0,42 ở 3%"),
-        ("78/150", "Holm toàn cục", r"78/150"),
         ("0,58–0,59", "đặc trưng pha ứng dụng", r"0,58–0,59"),
         ("1,000", "1-NN tầm thường", r"1,000"),
     ]

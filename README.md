@@ -26,7 +26,7 @@ thử PMTUD có kiểm soát**, và tái lập được 100% bằng script trong
 | 6 | Bằng chứng nhân quả cho #5 | Capture ghi **6 gói ICMP type 3 code 4** ở nhánh "cho qua", **0** ở nhánh "chặn" |
 | 7 | Rủi ro thuộc về *kích thước vượt PMTU*, không phải PQC | Ở PMTU 576, **X25519 cũng hỏng** (0/6) — nhưng cơ chế là **drop im lặng ở chặng veth/bridge** (0 gói ICMP trong capture), không phải blackhole PMTUD |
 | 8 | Độ tin cậy không suy giảm khi xử lý MTU đúng | **780/780** lần chạy client `rc=0`; **780/780** flow bắt được và phân tích được |
-| 9 | **Ranh giới quan sát** (không tuyên bố tính mới) | Phân loại nhóm KEM: họ đặc trưng **bắt tay = 1,00**, họ đặc trưng **pha ứng dụng = 0,58–0,59** (yếu nhưng vẫn trên ngẫu nhiên 0,5; p < 0,01) |
+| 9 | **Ranh giới quan sát** (không tuyên bố tính mới) | Phân loại nhóm KEM: họ đặc trưng **bắt tay = 1,00**, họ đặc trưng **pha ứng dụng = 0,58–0,59** (mô tả định lượng so với mức ngẫu nhiên 0,5; **không** gán p-value vì các flow trong cùng site gần như trùng nhau) |
 | 10 | Fixture phân loại của ta **tầm thường** — báo cáo thẳng | 1-NN trên **một** đặc trưng (tổng byte server) = **1.000**; vì vậy kết quả "kháng drift" không được coi là phát hiện |
 
 Kết luận vận hành: **PQC đắt về byte, và rủi ro thật nằm ở PMTUD/ICMP** — checklist chuyển đổi
