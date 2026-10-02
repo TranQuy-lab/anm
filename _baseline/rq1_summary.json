@@ -1,0 +1,64 @@
+{
+  "interleaved_design": true,
+  "reconciliation": {
+    "attempted": 780,
+    "rc_zero": 780,
+    "rc_nonzero": 0,
+    "captured": 780,
+    "failed_no_flight": 0,
+    "per_group_captured": {
+      "X25519": 390,
+      "X25519MLKEM768": 390
+    }
+  },
+  "clean_network": {
+    "X25519": {
+      "cl_ch_bytes": 217.0,
+      "cl_hs_novel_bytes": 297.0,
+      "sv_hs_bytes": 767.0,
+      "cl_ch_nseg": 1.0,
+      "wire_cl_nseg": 1.0
+    },
+    "X25519MLKEM768": {
+      "cl_ch_bytes": 1393.0,
+      "cl_hs_novel_bytes": 1473.0,
+      "sv_hs_bytes": 1845.0,
+      "cl_ch_nseg": 1.0,
+      "wire_cl_nseg": 1.0
+    }
+  },
+  "segmentation_median": {
+    "M576|X25519": {
+      "cl_ch_nseg": 1.0,
+      "wire_cl_nseg": 1.0,
+      "sv_nseg": 2.0
+    },
+    "M576|X25519MLKEM768": {
+      "cl_ch_nseg": 1.0,
+      "wire_cl_nseg": 3.0,
+      "sv_nseg": 4.0
+    },
+    "M1280|X25519": {
+      "cl_ch_nseg": 1.0,
+      "wire_cl_nseg": 1.0,
+      "sv_nseg": 1.0
+    },
+    "M1280|X25519MLKEM768": {
+      "cl_ch_nseg": 1.0,
+      "wire_cl_nseg": 2.0,
+      "sv_nseg": 2.0
+    },
+    "M1500|X25519": {
+      "cl_ch_nseg": 1.0,
+      "wire_cl_nseg": 1.0,
+      "sv_nseg": 1.0
+    },
+    "M1500|X25519MLKEM768": {
+      "cl_ch_nseg": 1.0,
+      "wire_cl_nseg": 1.0,
+      "sv_nseg": 2.0
+    }
+  },
+  "n_flows": 780,
+  "n_configs": 13
+}
